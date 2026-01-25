@@ -803,27 +803,20 @@
 
     arcLengthInput.value = settings.arcLengthDefault;
 
-    wrapper.querySelector('#store-mode-flag-arcs').addEventListener('change', (e) => {
-      settings.featureFlags.storyArcs = e.target.checked;
-      saveSettings();
-    });
-    wrapper.querySelector('#store-mode-flag-authors').addEventListener('change', (e) => {
-      settings.featureFlags.authorStyles = e.target.checked;
-      saveSettings();
-    });
-    wrapper.querySelector('#store-mode-flag-blueprints').addEventListener('change', (e) => {
-      settings.featureFlags.blueprints = e.target.checked;
-      saveSettings();
-    });
-    wrapper.querySelector('#store-mode-flag-extras').addEventListener('change', (e) => {
-      settings.featureFlags.extras = e.target.checked;
-      saveSettings();
-    });
+    const bindCheckbox = (selector, setter) => {
+      const input = wrapper.querySelector(selector);
+      if (!input) return;
+      input.addEventListener('change', (e) => {
+        setter(!!e.target.checked);
+        saveSettings();
+      });
+    };
 
-    wrapper.querySelector('#store-mode-flag-nsfw').addEventListener('change', (e) => {
-      settings.nsfwAuthorStyle = e.target.checked;
-      saveSettings();
-    });
+    bindCheckbox('#store-mode-flag-arcs', (value) => { settings.featureFlags.storyArcs = value; });
+    bindCheckbox('#store-mode-flag-authors', (value) => { settings.featureFlags.authorStyles = value; });
+    bindCheckbox('#store-mode-flag-blueprints', (value) => { settings.featureFlags.blueprints = value; });
+    bindCheckbox('#store-mode-flag-extras', (value) => { settings.featureFlags.extras = value; });
+    bindCheckbox('#store-mode-flag-nsfw', (value) => { settings.nsfwAuthorStyle = value; });
 
     arcLengthInput.addEventListener('change', (e) => {
       settings.arcLengthDefault = Math.max(parseInt(e.target.value || settings.arcLengthDefault, 10) || settings.arcLengthDefault, 1);

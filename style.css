@@ -80,6 +80,13 @@
   margin-bottom: 10px;
 }
 
+.store-mode-field label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
 .store-mode-field input:not([type="checkbox"]),
 .store-mode-field textarea,
 .store-mode-field select {
