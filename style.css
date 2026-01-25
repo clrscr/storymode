@@ -80,7 +80,7 @@
   margin-bottom: 10px;
 }
 
-.store-mode-field input,
+.store-mode-field input:not([type="checkbox"]),
 .store-mode-field textarea,
 .store-mode-field select {
   padding: 6px 8px;
@@ -88,6 +88,13 @@
   border: 1px solid var(--SmartThemeBorderColor, #444);
   background: var(--SmartThemeInputColor, #111);
   color: var(--SmartThemeBodyColor, #ddd);
+}
+
+.store-mode-field input[type="checkbox"] {
+  width: auto;
+  height: auto;
+  margin-right: 6px;
+  accent-color: var(--SmartThemeQuoteColor, #666);
 }
 
 .store-mode-actions {
