@@ -22,14 +22,14 @@
   padding: 6px 10px;
   border-radius: 6px;
   border: 1px solid var(--SmartThemeBorderColor, #444);
-  background: var(--SmartThemeQuoteColor, #2a2a2a);
+  background: var(--SmartThemeInputColor, #1b1b1b);
   color: var(--SmartThemeBodyColor, #e6e6e6);
   cursor: pointer;
 }
 
 .store-mode-tabs button.active {
-  background: var(--SmartThemeBorderColor, #555);
-  color: var(--SmartThemeBodyColor, #f5f5f5);
+  background: var(--SmartThemeBorderColor, #3a3a3a);
+  color: var(--SmartThemeBodyColor, #ffffff);
 }
 
 .store-mode-section {
@@ -68,9 +68,9 @@
 }
 
 .store-mode-list button.active {
-  border-color: var(--SmartThemeQuoteColor, #777);
-  background: var(--SmartThemeQuoteColor, #3a3a3a);
-  color: var(--SmartThemeBodyColor, #f5f5f5);
+  border-color: var(--SmartThemeBorderColor, #666);
+  background: var(--SmartThemeBorderColor, #3a3a3a);
+  color: var(--SmartThemeBodyColor, #ffffff);
 }
 
 .store-mode-field {
@@ -101,7 +101,13 @@
   padding: 6px 10px;
   border-radius: 6px;
   border: 1px solid var(--SmartThemeBorderColor, #444);
-  background: var(--SmartThemeQuoteColor, #2e2e2e);
+  background: var(--SmartThemeInputColor, #1b1b1b);
   color: var(--SmartThemeBodyColor, #f0f0f0);
   cursor: pointer;
+}
+
+.store-mode-tabs button:hover,
+.store-mode-actions button:hover,
+.store-mode-list button:hover {
+  background: var(--SmartThemeBorderColor, #333);
 }
