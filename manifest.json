@@ -1,0 +1,11 @@
+{
+  "display_name": "Store Mode",
+  "loading_order": 50,
+  "dependencies": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "storymode",
+  "version": "0.1.0",
+  "auto_update": true,
+  "generate_interceptor": "storeModeGenerateInterceptor"
+}

@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "items": [
+    {
+      "id": "auth_hemingway",
+      "name": "Ernest Hemingway",
+      "style": "Sparse, direct sentences; restrained emotion.",
+      "voice": "Stoic, observational.",
+      "notes": "Use concrete nouns and active verbs. Avoid ornate language."
+    },
+    {
+      "id": "auth_jane_austen",
+      "name": "Jane Austen",
+      "style": "Witty social observation and elegant syntax.",
+      "voice": "Dry humor with moral insight.",
+      "notes": "Use irony and careful manners."
+    },
+    {
+      "id": "auth_tolkien",
+      "name": "J.R.R. Tolkien",
+      "style": "Lyrical, archaic tone with rich world detail.",
+      "voice": "Mythic and earnest.",
+      "notes": "Use elevated diction and a sense of history."
+    },
+    {
+      "id": "auth_ursula_le_guin",
+      "name": "Ursula K. Le Guin",
+      "style": "Clear, thoughtful prose with philosophical depth.",
+      "voice": "Calm, reflective.",
+      "notes": "Let ideas emerge through character choices."
+    },
+    {
+      "id": "auth_octavia_butler",
+      "name": "Octavia Butler",
+      "style": "Precise, grounded, psychologically rich.",
+      "voice": "Serious, probing.",
+      "notes": "Focus on power dynamics and adaptation."
+    },
+    {
+      "id": "auth_george_rr_martin",
+      "name": "George R.R. Martin",
+      "style": "Gritty realism with political intrigue.",
+      "voice": "Blunt, pragmatic.",
+      "notes": "Show consequences and moral ambiguity."
+    },
+    {
+      "id": "auth_agatha_christie",
+      "name": "Agatha Christie",
+      "style": "Clean, clue-driven mystery prose.",
+      "voice": "Observant, analytical.",
+      "notes": "Plant fair clues; end with a crisp reveal."
+    },
+    {
+      "id": "auth_ray_bradbury",
+      "name": "Ray Bradbury",
+      "style": "Poetic, nostalgic, image-rich.",
+      "voice": "Wonder-filled, melancholy.",
+      "notes": "Use metaphor and sensory detail."
+    },
+    {
+      "id": "auth_arthur_c_clarke",
+      "name": "Arthur C. Clarke",
+      "style": "Clear, idea-forward science fiction.",
+      "voice": "Clinical but awe-struck.",
+      "notes": "Let the big concept lead the scene."
+    },
+    {
+      "id": "auth_philip_k_dick",
+      "name": "Philip K. Dick",
+      "style": "Paranoid, reality-bending narration.",
+      "voice": "Uncertain, urgent.",
+      "notes": "Blur the line between real and artificial."
+    },
+    {
+      "id": "auth_neil_gaiman",
+      "name": "Neil Gaiman",
+      "style": "Mythic modern fairy tale tone.",
+      "voice": "Wry, intimate.",
+      "notes": "Mix the mundane with the magical."
+    },
+    {
+      "id": "auth_margaret_atwood",
+      "name": "Margaret Atwood",
+      "style": "Sharp, precise, quietly unsettling.",
+      "voice": "Dry, incisive.",
+      "notes": "Use restrained emotion and social critique."
+    },
+    {
+      "id": "auth_isaac_asimov",
+      "name": "Isaac Asimov",
+      "style": "Logical, dialogue-driven.",
+      "voice": "Measured, rational.",
+      "notes": "Focus on problem solving and ideas."
+    },
+    {
+      "id": "auth_h_p_lovecraft",
+      "name": "H.P. Lovecraft",
+      "style": "Ornate, archaic, dread-filled.",
+      "voice": "Awe-struck and fearful.",
+      "notes": "Use long sentences and rising dread."
+    },
+    {
+      "id": "auth_edgar_allan_poe",
+      "name": "Edgar Allan Poe",
+      "style": "Musical, macabre, inward.",
+      "voice": "Obsessive, dark.",
+      "notes": "Emphasize rhythm and atmosphere."
+    },
+    {
+      "id": "auth_charlotte_bronte",
+      "name": "Charlotte Brontë",
+      "style": "Intense emotional focus.",
+      "voice": "Confessional, passionate.",
+      "notes": "Use strong interiority."
+    },
+    {
+      "id": "auth_mark_twain",
+      "name": "Mark Twain",
+      "style": "Folksy, humorous, sharp satire.",
+      "voice": "Conversational, sly.",
+      "notes": "Use regional color and irony."
+    },
+    {
+      "id": "auth_kurt_vonnegut",
+      "name": "Kurt Vonnegut",
+      "style": "Spare, ironic, darkly funny.",
+      "voice": "Deadpan, humane.",
+      "notes": "Short sentences and blunt truths."
+    },
+    {
+      "id": "auth_haruki_murakami",
+      "name": "Haruki Murakami",
+      "style": "Minimalist with surreal drift.",
+      "voice": "Detached, dreamlike.",
+      "notes": "Let the strange feel normal."
+    },
+    {
+      "id": "auth_cormac_mccarthy",
+      "name": "Cormac McCarthy",
+      "style": "Spare, biblical cadence.",
+      "voice": "Grim, elemental.",
+      "notes": "Avoid quotation marks; use strong imagery."
+    },
+    {
+      "id": "auth_stephen_king",
+      "name": "Stephen King",
+      "style": "Accessible, vivid, conversational.",
+      "voice": "Warm, ominous.",
+      "notes": "Use relatable detail to ground horror."
+    },
+    {
+      "id": "auth_robin_hobb",
+      "name": "Robin Hobb",
+      "style": "Emotional, character-driven fantasy.",
+      "voice": "Intimate, earnest.",
+      "notes": "Slow-burn character growth and consequence."
+    },
+    {
+      "id": "auth_n_k_jemisin",
+      "name": "N.K. Jemisin",
+      "style": "Dynamic voice with structural experimentation.",
+      "voice": "Powerful, urgent.",
+      "notes": "Use strong perspective and world depth."
+    },
+    {
+      "id": "auth_susan_collins",
+      "name": "Suzanne Collins",
+      "style": "Direct, fast-paced YA tension.",
+      "voice": "Focused, immediate.",
+      "notes": "Keep stakes front and center."
+    },
+    {
+      "id": "auth_mary_shelley",
+      "name": "Mary Shelley",
+      "style": "Gothic, reflective prose.",
+      "voice": "Melancholy, contemplative.",
+      "notes": "Balance horror with moral inquiry."
+    },
+    {
+      "id": "auth_alexandre_dumas",
+      "name": "Alexandre Dumas",
+      "style": "Swashbuckling, energetic narration.",
+      "voice": "Grand, dramatic.",
+      "notes": "Use momentum and bold stakes."
+    },
+    {
+      "id": "auth_terry_pratchett",
+      "name": "Terry Pratchett",
+      "style": "Satirical fantasy with wit.",
+      "voice": "Playful, clever.",
+      "notes": "Use footnote-like asides and humor."
+    },
+    {
+      "id": "auth_gillian_flynn",
+      "name": "Gillian Flynn",
+      "style": "Sharp, twisty psychological tension.",
+      "voice": "Cool, biting.",
+      "notes": "Keep motives murky."
+    },
+    {
+      "id": "auth_daniel_keyes",
+      "name": "Daniel Keyes",
+      "style": "Simple, emotional progression.",
+      "voice": "Earnest, vulnerable.",
+      "notes": "Show growth through language shifts."
+    },
+    {
+      "id": "auth_james_ellroy",
+      "name": "James Ellroy",
+      "style": "Staccato, hard-edged noir.",
+      "voice": "Aggressive, terse.",
+      "notes": "Use clipped sentences and raw slang."
+    },
+    {
+      "id": "auth_sally_rooney",
+      "name": "Sally Rooney",
+      "style": "Minimalist, precise social realism.",
+      "voice": "Cool, intimate.",
+      "notes": "Focus on subtext and small gestures."
+    },
+    {
+      "id": "auth_leigh_bardugo",
+      "name": "Leigh Bardugo",
+      "style": "Dark, stylish YA fantasy.",
+      "voice": "Confident, witty.",
+      "notes": "Blend swagger with vulnerability."
+    },
+    {
+      "id": "auth_cj_cherryh",
+      "name": "C.J. Cherryh",
+      "style": "Dense, political sci‑fi.",
+      "voice": "Precise, observant.",
+      "notes": "Track alliances and cultural nuance."
+    },
+    {
+      "id": "auth_becky_chambers",
+      "name": "Becky Chambers",
+      "style": "Warm, character-first sci‑fi.",
+      "voice": "Compassionate, hopeful.",
+      "notes": "Emphasize kindness and community."
+    },
+    {
+      "id": "auth_dashiell_hammett",
+      "name": "Dashiell Hammett",
+      "style": "Lean, tough, noir realism.",
+      "voice": "Dry, sharp.",
+      "notes": "Let dialogue carry tension."
+    },
+    {
+      "id": "auth_sylvia_plath",
+      "name": "Sylvia Plath",
+      "style": "Poetic, intense interiority.",
+      "voice": "Vivid, raw.",
+      "notes": "Use metaphor and emotional precision."
+    },
+    {
+      "id": "auth_oscar_wilde",
+      "name": "Oscar Wilde",
+      "style": "Elegant, epigrammatic wit.",
+      "voice": "Playful, biting.",
+      "notes": "Use clever dialogue and paradox."
+    },
+    {
+      "id": "auth_zadie_smith",
+      "name": "Zadie Smith",
+      "style": "Lively, layered social prose.",
+      "voice": "Observant, energetic.",
+      "notes": "Mix humor with cultural insight."
+    },
+    {
+      "id": "auth_ian_m_banks",
+      "name": "Iain M. Banks",
+      "style": "Big-idea, stylish sci‑fi.",
+      "voice": "Wry, expansive.",
+      "notes": "Mix scale with character agency."
+    },
+    {
+      "id": "auth_joe_abercrombie",
+      "name": "Joe Abercrombie",
+      "style": "Gritty, darkly humorous fantasy.",
+      "voice": "Snarky, blunt.",
+      "notes": "Keep action visceral and dialogue sharp."
+    },
+    {
+      "id": "auth_seanan_mcguire",
+      "name": "Seanan McGuire",
+      "style": "Snappy, contemporary fantasy.",
+      "voice": "Smart, quick.",
+      "notes": "Balance humor with heart."
+    }
+  ]
+}

@@ -1,0 +1,383 @@
+{
+  "schema_version": 1,
+  "items": [
+    {
+      "id": "arc_noir_detective",
+      "title": "Noir Detective",
+      "genre": "Noir / Mystery",
+      "tone": "Cynical, moody, rain-soaked",
+      "pacing": "Measured investigation → sudden violence → uneasy resolution",
+      "tropes": "Hardboiled PI, femme fatale, corrupt officials, smoky bars",
+      "guidance": "Use sparse, sharp prose. Emphasize moral ambiguity and urban grit. Reveal clues gradually with misdirection."
+    },
+    {
+      "id": "arc_cosmic_horror",
+      "title": "Cosmic Horror",
+      "genre": "Horror",
+      "tone": "Dreadful, uncanny, vast",
+      "pacing": "Slow burn → revelation → existential terror",
+      "tropes": "Forbidden knowledge, ancient entities, insignificance of humanity",
+      "guidance": "Lean into atmosphere and scale. Suggest more than show. End with lingering unease."
+    },
+    {
+      "id": "arc_epic_fantasy",
+      "title": "Epic Fantasy Quest",
+      "genre": "Fantasy",
+      "tone": "Mythic, hopeful, earnest",
+      "pacing": "Call to adventure → trials → climax",
+      "tropes": "Chosen one, ancient prophecy, companions, lost relic",
+      "guidance": "Build a sense of wonder and history. Use rich world detail and clear stakes."
+    },
+    {
+      "id": "arc_cyberpunk_thriller",
+      "title": "Cyberpunk Thriller",
+      "genre": "Science Fiction",
+      "tone": "Neon, tense, tech-saturated",
+      "pacing": "Fast escalation → double-cross → high-stakes finale",
+      "tropes": "Megacorp intrigue, hackers, augmented bodies, urban sprawl",
+      "guidance": "Keep momentum high. Blend high tech with social decay. Use sharp, modern diction."
+    },
+    {
+      "id": "arc_space_opera",
+      "title": "Space Opera",
+      "genre": "Science Fiction",
+      "tone": "Grand, adventurous",
+      "pacing": "Skirmish → alliance → decisive battle",
+      "tropes": "Galactic empires, starship duels, political intrigue",
+      "guidance": "Go big on scale and spectacle. Keep character motivations clear."
+    },
+    {
+      "id": "arc_post_apocalypse",
+      "title": "Post-Apocalyptic Survival",
+      "genre": "Speculative",
+      "tone": "Harsh, spare",
+      "pacing": "Scavenge → conflict → fragile hope",
+      "tropes": "Ruined cities, scarce resources, roaming threats",
+      "guidance": "Focus on resource tension and moral compromises. Small choices matter."
+    },
+    {
+      "id": "arc_urban_fantasy",
+      "title": "Urban Fantasy",
+      "genre": "Fantasy",
+      "tone": "Witty, contemporary",
+      "pacing": "Mystery reveal → magical confrontation",
+      "tropes": "Hidden magical society, modern setting with old powers",
+      "guidance": "Blend mundane with magical. Use modern voice and quick banter."
+    },
+    {
+      "id": "arc_romantic_comedy",
+      "title": "Romantic Comedy",
+      "genre": "Romance",
+      "tone": "Light, playful",
+      "pacing": "Meet-cute → misunderstandings → heartfelt resolution",
+      "tropes": "Opposites attract, witty banter, grand gesture",
+      "guidance": "Prioritize chemistry, humor, and emotional beats."
+    },
+    {
+      "id": "arc_gothic_romance",
+      "title": "Gothic Romance",
+      "genre": "Romance / Gothic",
+      "tone": "Brooding, atmospheric",
+      "pacing": "Secrets → revelation → bittersweet resolve",
+      "tropes": "Haunted estates, tragic pasts, hidden letters",
+      "guidance": "Use sensory detail, shadows, and emotional intensity."
+    },
+    {
+      "id": "arc_historical_drama",
+      "title": "Historical Drama",
+      "genre": "Historical",
+      "tone": "Grounded, poignant",
+      "pacing": "Rising tension → personal cost → sober closure",
+      "tropes": "Social constraints, honor, legacy",
+      "guidance": "Respect period details, focus on character choices."
+    },
+    {
+      "id": "arc_steampunk_adventure",
+      "title": "Steampunk Adventure",
+      "genre": "Fantasy / Adventure",
+      "tone": "Inventive, rollicking",
+      "pacing": "Discovery → pursuit → daring escape",
+      "tropes": "Airships, clockwork devices, Victorian flair",
+      "guidance": "Mix wonder with action. Keep gadgets tangible and characterful."
+    },
+    {
+      "id": "arc_military_scifi",
+      "title": "Military Sci‑Fi",
+      "genre": "Science Fiction",
+      "tone": "Disciplined, tense",
+      "pacing": "Briefing → mission → extraction",
+      "tropes": "Squad dynamics, alien threats, tactical stakes",
+      "guidance": "Use clear objectives, chain of command, and tactical detail."
+    },
+    {
+      "id": "arc_time_travel_paradox",
+      "title": "Time-Travel Paradox",
+      "genre": "Science Fiction",
+      "tone": "Intricate, suspenseful",
+      "pacing": "Discovery → temporal loop → resolution",
+      "tropes": "Bootstrap paradox, altered timelines",
+      "guidance": "Track causality carefully. Emphasize consequences."
+    },
+    {
+      "id": "arc_heist",
+      "title": "Heist",
+      "genre": "Crime / Thriller",
+      "tone": "Slick, tense",
+      "pacing": "Recruit → plan → execute → twist",
+      "tropes": "Specialist crew, double-cross, ticking clock",
+      "guidance": "Keep steps clear and reveal twists with flair."
+    },
+    {
+      "id": "arc_political_thriller",
+      "title": "Political Thriller",
+      "genre": "Thriller",
+      "tone": "Paranoid, urgent",
+      "pacing": "Leak → pursuit → exposure",
+      "tropes": "Conspiracy, whistleblower, shadowy agencies",
+      "guidance": "Use tight pacing and escalating stakes."
+    },
+    {
+      "id": "arc_legal_drama",
+      "title": "Legal Drama",
+      "genre": "Drama",
+      "tone": "Sharp, contentious",
+      "pacing": "Case build → courtroom → verdict",
+      "tropes": "Surprise witness, ethical dilemma",
+      "guidance": "Highlight rhetoric, evidence reveals, and moral tension."
+    },
+    {
+      "id": "arc_medical_drama",
+      "title": "Medical Drama",
+      "genre": "Drama",
+      "tone": "Intense, compassionate",
+      "pacing": "Emergency → difficult choice → outcome",
+      "tropes": "Impossible case, burnout, humanity in crisis",
+      "guidance": "Balance clinical detail with emotion."
+    },
+    {
+      "id": "arc_superhero_origin",
+      "title": "Superhero Origin",
+      "genre": "Superhero",
+      "tone": "Aspirational, kinetic",
+      "pacing": "Inciting incident → training → first test",
+      "tropes": "Secret identity, mentorship, moral code",
+      "guidance": "Focus on identity and responsibility."
+    },
+    {
+      "id": "arc_dark_fantasy",
+      "title": "Dark Fantasy",
+      "genre": "Fantasy",
+      "tone": "Bleak, eerie",
+      "pacing": "Creeping threat → confrontation → costly survival",
+      "tropes": "Cursed lands, forbidden magic, tragic heroes",
+      "guidance": "Use stark imagery and moral compromise."
+    },
+    {
+      "id": "arc_cozy_mystery",
+      "title": "Cozy Mystery",
+      "genre": "Mystery",
+      "tone": "Charming, light",
+      "pacing": "Small-town puzzle → reveal",
+      "tropes": "Amateur sleuth, quaint setting, gentle twists",
+      "guidance": "Keep stakes personal, not grisly."
+    },
+    {
+      "id": "arc_ya_coming_of_age",
+      "title": "YA Coming-of-Age",
+      "genre": "YA",
+      "tone": "Earnest, emotional",
+      "pacing": "Challenge → growth → acceptance",
+      "tropes": "Friendship, first love, self-discovery",
+      "guidance": "Use direct voice and internal reflection."
+    },
+    {
+      "id": "arc_folk_horror",
+      "title": "Folk Horror",
+      "genre": "Horror",
+      "tone": "Uneasy, rustic",
+      "pacing": "Outsider arrival → ritual → revelation",
+      "tropes": "Isolated community, old customs",
+      "guidance": "Use nature and tradition as sources of dread."
+    },
+    {
+      "id": "arc_mythic_retelling",
+      "title": "Mythic Retelling",
+      "genre": "Fantasy",
+      "tone": "Lyrical, fated",
+      "pacing": "Prophecy → trials → sacrifice",
+      "tropes": "Gods, omens, heroic tests",
+      "guidance": "Weave archetypes with fresh character depth."
+    },
+    {
+      "id": "arc_slice_of_life",
+      "title": "Slice of Life",
+      "genre": "Contemporary",
+      "tone": "Gentle, reflective",
+      "pacing": "Everyday moments → subtle change",
+      "tropes": "Small routines, quiet revelations",
+      "guidance": "Let character voice carry the story."
+    },
+    {
+      "id": "arc_psychological_thriller",
+      "title": "Psychological Thriller",
+      "genre": "Thriller",
+      "tone": "Unsettling, intense",
+      "pacing": "Doubt → obsession → break",
+      "tropes": "Unreliable narrator, paranoia",
+      "guidance": "Keep reality ambiguous until late."
+    },
+    {
+      "id": "arc_hard_scifi",
+      "title": "Hard Sci‑Fi",
+      "genre": "Science Fiction",
+      "tone": "Analytical, awe",
+      "pacing": "Discovery → problem-solving → breakthrough",
+      "tropes": "Realistic tech, scientific method",
+      "guidance": "Ground ideas in plausible science."
+    },
+    {
+      "id": "arc_climate_fiction",
+      "title": "Climate Fiction",
+      "genre": "Speculative",
+      "tone": "Urgent, grounded",
+      "pacing": "Warning signs → crisis → adaptation",
+      "tropes": "Extreme weather, displacement, resilience",
+      "guidance": "Show systems-level change through personal stakes."
+    },
+    {
+      "id": "arc_murder_mystery",
+      "title": "Classic Whodunit",
+      "genre": "Mystery",
+      "tone": "Cerebral, curious",
+      "pacing": "Clues → red herrings → reveal",
+      "tropes": "Closed circle suspects, grand reveal",
+      "guidance": "Plant fair clues and track timelines."
+    },
+    {
+      "id": "arc_adventure_pulp",
+      "title": "Pulp Adventure",
+      "genre": "Adventure",
+      "tone": "High energy, bold",
+      "pacing": "Peril → escape → chase",
+      "tropes": "Lost temples, daring heroes",
+      "guidance": "Keep action brisk and stakes visceral."
+    },
+    {
+      "id": "arc_horror_slash",
+      "title": "Slasher Horror",
+      "genre": "Horror",
+      "tone": "Tense, relentless",
+      "pacing": "Stalking → confrontation → final stand",
+      "tropes": "Isolated setting, escalating kills",
+      "guidance": "Emphasize suspense and narrow escapes."
+    },
+    {
+      "id": "arc_espionage",
+      "title": "Espionage",
+      "genre": "Thriller",
+      "tone": "Sleek, clandestine",
+      "pacing": "Assignment → infiltration → extraction",
+      "tropes": "Double agents, tradecraft, exotic locales",
+      "guidance": "Use tradecraft details and layered motives."
+    },
+    {
+      "id": "arc_revenge",
+      "title": "Revenge Tragedy",
+      "genre": "Drama",
+      "tone": "Dark, intense",
+      "pacing": "Injury → plotting → reckoning",
+      "tropes": "Betrayal, moral decline",
+      "guidance": "Track the cost of vengeance."
+    },
+    {
+      "id": "arc_buddy_comedy",
+      "title": "Buddy Comedy",
+      "genre": "Comedy",
+      "tone": "Playful, warm",
+      "pacing": "Clash → teamwork → payoff",
+      "tropes": "Odd couple, escalating mishaps",
+      "guidance": "Let banter and escalating gags drive scenes."
+    },
+    {
+      "id": "arc_military_fantasy",
+      "title": "Military Fantasy",
+      "genre": "Fantasy",
+      "tone": "Gritty, strategic",
+      "pacing": "Siege → maneuver → decisive battle",
+      "tropes": "War councils, siegecraft, battlefield magic",
+      "guidance": "Blend tactics with mythic stakes."
+    },
+    {
+      "id": "arc_dystopian_rebellion",
+      "title": "Dystopian Rebellion",
+      "genre": "Speculative",
+      "tone": "Defiant, grim",
+      "pacing": "Oppression → uprising → costly victory",
+      "tropes": "Totalitarian regime, underground resistance",
+      "guidance": "Show systemic control and the price of freedom."
+    },
+    {
+      "id": "arc_fairy_tale",
+      "title": "Fairy Tale",
+      "genre": "Fantasy",
+      "tone": "Whimsical, moral",
+      "pacing": "Enchantment → trial → moral ending",
+      "tropes": "Curses, magical helpers",
+      "guidance": "Keep language simple and symbolic."
+    },
+    {
+      "id": "arc_mystery_techno",
+      "title": "Techno-Mystery",
+      "genre": "Tech Thriller",
+      "tone": "Analytical, tense",
+      "pacing": "Anomaly → trace → exposure",
+      "tropes": "Encrypted clues, digital forensics",
+      "guidance": "Blend investigative logic with tech detail."
+    },
+    {
+      "id": "arc_road_trip",
+      "title": "Road Trip",
+      "genre": "Adventure",
+      "tone": "Open, reflective",
+      "pacing": "Departure → encounters → arrival",
+      "tropes": "Episodic stops, found family",
+      "guidance": "Use changing landscapes to mirror growth."
+    },
+    {
+      "id": "arc_survival_island",
+      "title": "Survival Island",
+      "genre": "Adventure",
+      "tone": "Tense, resourceful",
+      "pacing": "Disaster → adaptation → rescue or reinvention",
+      "tropes": "Stranded survivors, scarce food, secrets",
+      "guidance": "Emphasize ingenuity and interpersonal friction."
+    },
+    {
+      "id": "arc_ghost_story",
+      "title": "Ghost Story",
+      "genre": "Horror",
+      "tone": "Melancholic, eerie",
+      "pacing": "Haunting → investigation → release",
+      "tropes": "Restless spirits, old wrongs",
+      "guidance": "Mix sorrow with fear; make the ghost sympathetic."
+    },
+    {
+      "id": "arc_krimi",
+      "title": "Scandi Noir",
+      "genre": "Mystery",
+      "tone": "Bleak, procedural",
+      "pacing": "Casework → personal toll → truth",
+      "tropes": "Social critique, lonely detectives",
+      "guidance": "Understated emotion with sharp social detail."
+    },
+    {
+      "id": "arc_magical_realism",
+      "title": "Magical Realism",
+      "genre": "Literary",
+      "tone": "Dreamlike, intimate",
+      "pacing": "Everyday life → subtle wonder → meaning",
+      "tropes": "Ordinary with the uncanny",
+      "guidance": "Treat magic as mundane, focus on emotional truth."
+    }
+  ]
+}
