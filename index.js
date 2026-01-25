@@ -20,6 +20,8 @@
       blueprints: true,
       extras: true
     },
+    arcLengthDefault: 30,
+    nsfwAuthorStyle: false,
     storyArcs: [],
     authorStyles: [],
     blueprints: [],
@@ -71,7 +73,12 @@
         activeArcId: null,
         activeAuthorId: null,
         activeBlueprintId: null,
-        currentBeatIndex: 0
+        currentBeatIndex: 0,
+        currentSceneIndex: 0,
+        currentStep: 0,
+        arcLength: 30,
+        pacingMode: 'story',
+        storyComplete: false
       };
     }
     return chatMetadata[MODULE_NAME];
@@ -97,8 +104,9 @@
       try {
         const res = await fetch(`${baseUrl}data/story_arcs.json`);
         const json = await res.json();
-        if (Array.isArray(json.items) && json.items.length) {
-          settings.storyArcs = json.items;
+        const items = Array.isArray(json) ? json : json.items;
+        if (Array.isArray(items) && items.length) {
+          settings.storyArcs = items;
         }
         settings.seed.arcs = true;
       } catch (err) {
@@ -111,8 +119,9 @@
       try {
         const res = await fetch(`${baseUrl}data/author_styles.json`);
         const json = await res.json();
-        if (Array.isArray(json.items) && json.items.length) {
-          settings.authorStyles = json.items;
+        const items = Array.isArray(json) ? json : json.items;
+        if (Array.isArray(items) && items.length) {
+          settings.authorStyles = items;
         }
         settings.seed.authors = true;
       } catch (err) {
@@ -135,15 +144,34 @@
 
     const sections = [];
     if (settings.featureFlags.storyArcs && arc) {
-      sections.push(`Story Arc\nTitle: ${arc.title || ''}\nGenre: ${arc.genre || ''}\nTone: ${arc.tone || ''}\nPacing: ${arc.pacing || ''}\nTropes: ${arc.tropes || ''}\nGuidance: ${arc.guidance || ''}`);
+      const phaseInfo = getPhaseInfo(state.currentStep, state.arcLength);
+      const storyPrompt = arc.storyPrompt || buildStoryPrompt(arc);
+      const phasePrompt = arc.phasePrompts ? arc.phasePrompts[phaseInfo.phase] : '';
+      const progressLine = formatProgress(arc.progressTemplate, phaseInfo);
+
+      sections.push([
+        `Story Type\nName: ${getArcName(arc)}`,
+        storyPrompt ? `Story Prompt: ${storyPrompt}` : '',
+        phasePrompt ? `Phase Prompt (${phaseInfo.phase}): ${phasePrompt}` : '',
+        progressLine ? progressLine : ''
+      ].filter(Boolean).join('\n'));
     }
     if (settings.featureFlags.authorStyles && author) {
-      sections.push(`Author Style\nName: ${author.name || ''}\nStyle: ${author.style || ''}\nVoice: ${author.voice || ''}\nNotes: ${author.notes || ''}`);
+      const prompt = author.authorPrompt || buildAuthorPrompt(author);
+      const nsfw = settings.nsfwAuthorStyle && author.nsfwPrompt ? `NSFW Guidance: ${author.nsfwPrompt}` : '';
+      sections.push([
+        `Author Style\nName: ${author.name || ''}`,
+        prompt ? `Author Prompt: ${prompt}` : '',
+        nsfw
+      ].filter(Boolean).join('\n'));
     }
     if (settings.featureFlags.blueprints && blueprint) {
       const beat = getCurrentBeat(blueprint, state.currentBeatIndex);
       if (beat) {
-        sections.push(`Scenario Blueprint\nTitle: ${blueprint.title || ''}\nCurrent Beat: ${beat.label || ''}\nGoal: ${beat.goal || ''}\nPrompt: ${beat.prompt || ''}`);
+        const signalHint = state.pacingMode === 'scenario'
+          ? 'Use @@BEAT:N@@, @@NEXT_SCENE@@, @@STORY_COMPLETE@@ signals at the end of responses.'
+          : '';
+        sections.push(`Scenario Blueprint\nTitle: ${blueprint.title || ''}\nCurrent Beat: ${beat.label || ''}\nGoal: ${beat.goal || ''}\nPrompt: ${beat.prompt || ''}\n${signalHint}`.trim());
       }
     }
 
@@ -156,6 +184,65 @@
     const beats = blueprint.scenes.flatMap(scene => scene.beats || []);
     if (!beats.length) return null;
     return beats[Math.min(beatIndex, beats.length - 1)];
+  }
+
+  function getArcName(arc) {
+    return arc.name || arc.title || '';
+  }
+
+  function buildStoryPrompt(arc) {
+    const parts = [
+      arc.storyPrompt,
+      arc.guidance,
+      arc.tone ? `Tone: ${arc.tone}` : '',
+      arc.pacing ? `Pacing: ${arc.pacing}` : '',
+      arc.tropes ? `Tropes: ${arc.tropes}` : '',
+      arc.genre ? `Genre: ${arc.genre}` : '',
+      Array.isArray(arc.category) ? `Category: ${arc.category.join(', ')}` : ''
+    ].filter(Boolean);
+    return parts.join(' ');
+  }
+
+  function buildAuthorPrompt(author) {
+    const parts = [
+      author.authorPrompt,
+      author.style,
+      author.voice,
+      author.notes,
+      Array.isArray(author.keywords) ? `Keywords: ${author.keywords.join(', ')}` : ''
+    ].filter(Boolean);
+    return parts.join(' ');
+  }
+
+  function getPhaseInfo(currentStep, arcLength) {
+    const safeLength = Math.max(arcLength || 1, 1);
+    const step = Math.max(currentStep || 0, 0);
+    const arcPercent = Math.min(Math.round((step / safeLength) * 100), 100);
+    const phase = arcPercent < 34 ? 'setup' : arcPercent < 67 ? 'confrontation' : 'resolution';
+    const totalInPhase = Math.ceil(safeLength / 3);
+    const positionInPhase = Math.min(step % totalInPhase, totalInPhase);
+    const phasePercent = Math.min(Math.round((positionInPhase / totalInPhase) * 100), 100);
+    return {
+      currentStep: step,
+      arcLength: safeLength,
+      arcPercent,
+      phase,
+      positionInPhase,
+      totalInPhase,
+      phasePercent
+    };
+  }
+
+  function formatProgress(template, phaseInfo) {
+    if (!template) return '';
+    return template
+      .replace('{currentStep}', phaseInfo.currentStep)
+      .replace('{arcLength}', phaseInfo.arcLength)
+      .replace('{arcPercent}', phaseInfo.arcPercent)
+      .replace('{phase}', phaseInfo.phase)
+      .replace('{positionInPhase}', phaseInfo.positionInPhase)
+      .replace('{totalInPhase}', phaseInfo.totalInPhase)
+      .replace('{phasePercent}', phaseInfo.phasePercent);
   }
 
   globalThis.storeModeGenerateInterceptor = async function (chat, contextSize, abort, type) {
@@ -198,6 +285,10 @@
               <label>Active Arc</label>
               <select id="store-mode-active-arc"></select>
             </div>
+            <div class="store-mode-field">
+              <label>Arc Length (messages)</label>
+              <input id="store-mode-arc-length" type="number" min="1" />
+            </div>
             <div class="store-mode-actions">
               <button id="store-mode-arc-apply">Apply to chat</button>
               <button id="store-mode-arc-clear">Clear selection</button>
@@ -219,6 +310,11 @@
             <div class="store-mode-field"><label>Pacing</label><input id="store-mode-arc-pacing" /></div>
             <div class="store-mode-field"><label>Tropes</label><textarea id="store-mode-arc-tropes" rows="3"></textarea></div>
             <div class="store-mode-field"><label>Guidance</label><textarea id="store-mode-arc-guidance" rows="4"></textarea></div>
+            <div class="store-mode-field"><label>Story Prompt</label><textarea id="store-mode-arc-story-prompt" rows="4"></textarea></div>
+            <div class="store-mode-field"><label>Phase Prompt (Setup)</label><textarea id="store-mode-arc-phase-setup" rows="3"></textarea></div>
+            <div class="store-mode-field"><label>Phase Prompt (Confrontation)</label><textarea id="store-mode-arc-phase-confrontation" rows="3"></textarea></div>
+            <div class="store-mode-field"><label>Phase Prompt (Resolution)</label><textarea id="store-mode-arc-phase-resolution" rows="3"></textarea></div>
+            <div class="store-mode-field"><label>Progress Template</label><input id="store-mode-arc-progress-template" /></div>
             <div class="store-mode-actions">
               <button id="store-mode-arc-save">Save</button>
             </div>
@@ -249,9 +345,12 @@
           </div>
           <div>
             <div class="store-mode-field"><label>Name</label><input id="store-mode-author-name" /></div>
+            <div class="store-mode-field"><label>Author Prompt</label><textarea id="store-mode-author-prompt" rows="4"></textarea></div>
             <div class="store-mode-field"><label>Style</label><textarea id="store-mode-author-style" rows="4"></textarea></div>
             <div class="store-mode-field"><label>Voice</label><textarea id="store-mode-author-voice" rows="3"></textarea></div>
             <div class="store-mode-field"><label>Notes</label><textarea id="store-mode-author-notes" rows="3"></textarea></div>
+            <div class="store-mode-field"><label>NSFW Prompt</label><textarea id="store-mode-author-nsfw" rows="3"></textarea></div>
+            <div class="store-mode-field"><label>Keywords (comma-separated)</label><input id="store-mode-author-keywords" /></div>
             <div class="store-mode-actions">
               <button id="store-mode-author-save">Save</button>
             </div>
@@ -307,6 +406,9 @@
         <div class="store-mode-field">
           <label><input type="checkbox" id="store-mode-flag-extras" /> Enable Extras</label>
         </div>
+        <div class="store-mode-field">
+          <label><input type="checkbox" id="store-mode-flag-nsfw" /> Enable Author NSFW Prompt</label>
+        </div>
         <div class="store-mode-actions">
           <button id="store-mode-run-summary">Generate Summary</button>
           <button id="store-mode-run-epilogue">Generate Epilogue</button>
@@ -341,6 +443,7 @@
 
     const arcList = wrapper.querySelector('#store-mode-arc-list');
     const arcActive = wrapper.querySelector('#store-mode-active-arc');
+    const arcLengthInput = wrapper.querySelector('#store-mode-arc-length');
 
     const authorList = wrapper.querySelector('#store-mode-author-list');
     const authorActive = wrapper.querySelector('#store-mode-active-author');
@@ -357,7 +460,7 @@
       arcActive.innerHTML = '<option value="">None</option>';
       settings.storyArcs.forEach(item => {
         const btn = document.createElement('button');
-        btn.textContent = item.title || '(untitled)';
+        btn.textContent = getArcName(item) || '(untitled)';
         btn.classList.toggle('active', item.id === selectedArcId);
         btn.addEventListener('click', () => {
           selectedArcId = item.id;
@@ -368,7 +471,7 @@
 
         const opt = document.createElement('option');
         opt.value = item.id;
-        opt.textContent = item.title || '(untitled)';
+        opt.textContent = getArcName(item) || '(untitled)';
         opt.selected = item.id === state.activeArcId;
         arcActive.appendChild(opt);
       });
@@ -425,13 +528,21 @@
       wrapper.querySelector('#store-mode-arc-pacing').value = item.pacing || '';
       wrapper.querySelector('#store-mode-arc-tropes').value = item.tropes || '';
       wrapper.querySelector('#store-mode-arc-guidance').value = item.guidance || '';
+      wrapper.querySelector('#store-mode-arc-story-prompt').value = item.storyPrompt || '';
+      wrapper.querySelector('#store-mode-arc-phase-setup').value = item.phasePrompts ? (item.phasePrompts.setup || '') : '';
+      wrapper.querySelector('#store-mode-arc-phase-confrontation').value = item.phasePrompts ? (item.phasePrompts.confrontation || '') : '';
+      wrapper.querySelector('#store-mode-arc-phase-resolution').value = item.phasePrompts ? (item.phasePrompts.resolution || '') : '';
+      wrapper.querySelector('#store-mode-arc-progress-template').value = item.progressTemplate || '';
     }
 
     function fillAuthorForm(item) {
       wrapper.querySelector('#store-mode-author-name').value = item.name || '';
+      wrapper.querySelector('#store-mode-author-prompt').value = item.authorPrompt || '';
       wrapper.querySelector('#store-mode-author-style').value = item.style || '';
       wrapper.querySelector('#store-mode-author-voice').value = item.voice || '';
       wrapper.querySelector('#store-mode-author-notes').value = item.notes || '';
+      wrapper.querySelector('#store-mode-author-nsfw').value = item.nsfwPrompt || '';
+      wrapper.querySelector('#store-mode-author-keywords').value = Array.isArray(item.keywords) ? item.keywords.join(', ') : '';
     }
 
     function fillBlueprintForm(item) {
@@ -445,11 +556,19 @@
       const newItem = {
         id: makeId('arc'),
         title: 'New Arc',
+        name: 'New Arc',
         genre: '',
         tone: '',
         pacing: '',
         tropes: '',
-        guidance: ''
+        guidance: '',
+        storyPrompt: '',
+        progressTemplate: 'Arc Progress: Step {currentStep}/{arcLength} ({arcPercent}% complete). Phase: {phase} - Message {positionInPhase}/{totalInPhase} ({phasePercent}% through {phase}).',
+        phasePrompts: {
+          setup: '',
+          confrontation: '',
+          resolution: ''
+        }
       };
       settings.storyArcs.unshift(newItem);
       selectedArcId = newItem.id;
@@ -463,11 +582,19 @@
       const item = settings.storyArcs.find(arc => arc.id === selectedArcId);
       if (!item) return;
       item.title = wrapper.querySelector('#store-mode-arc-title').value.trim();
+      item.name = item.title;
       item.genre = wrapper.querySelector('#store-mode-arc-genre').value.trim();
       item.tone = wrapper.querySelector('#store-mode-arc-tone').value.trim();
       item.pacing = wrapper.querySelector('#store-mode-arc-pacing').value.trim();
       item.tropes = wrapper.querySelector('#store-mode-arc-tropes').value.trim();
       item.guidance = wrapper.querySelector('#store-mode-arc-guidance').value.trim();
+      item.storyPrompt = wrapper.querySelector('#store-mode-arc-story-prompt').value.trim();
+      item.progressTemplate = wrapper.querySelector('#store-mode-arc-progress-template').value.trim();
+      item.phasePrompts = {
+        setup: wrapper.querySelector('#store-mode-arc-phase-setup').value.trim(),
+        confrontation: wrapper.querySelector('#store-mode-arc-phase-confrontation').value.trim(),
+        resolution: wrapper.querySelector('#store-mode-arc-phase-resolution').value.trim()
+      };
       renderArcList();
       saveSettings();
     });
@@ -483,12 +610,17 @@
     wrapper.querySelector('#store-mode-arc-apply').addEventListener('click', async () => {
       const state = getChatState();
       state.activeArcId = arcActive.value || null;
+      state.arcLength = Math.max(parseInt(arcLengthInput.value || settings.arcLengthDefault, 10) || settings.arcLengthDefault, 1);
+      state.currentStep = 0;
+      state.storyComplete = false;
       await saveChatState();
     });
 
     wrapper.querySelector('#store-mode-arc-clear').addEventListener('click', async () => {
       const state = getChatState();
       state.activeArcId = null;
+      state.currentStep = 0;
+      state.storyComplete = false;
       arcActive.value = '';
       await saveChatState();
     });
@@ -512,9 +644,12 @@
       const newItem = {
         id: makeId('author'),
         name: 'New Author',
+        authorPrompt: '',
         style: '',
         voice: '',
-        notes: ''
+        notes: '',
+        nsfwPrompt: '',
+        keywords: []
       };
       settings.authorStyles.unshift(newItem);
       selectedAuthorId = newItem.id;
@@ -528,9 +663,13 @@
       const item = settings.authorStyles.find(author => author.id === selectedAuthorId);
       if (!item) return;
       item.name = wrapper.querySelector('#store-mode-author-name').value.trim();
+      item.authorPrompt = wrapper.querySelector('#store-mode-author-prompt').value.trim();
       item.style = wrapper.querySelector('#store-mode-author-style').value.trim();
       item.voice = wrapper.querySelector('#store-mode-author-voice').value.trim();
       item.notes = wrapper.querySelector('#store-mode-author-notes').value.trim();
+      item.nsfwPrompt = wrapper.querySelector('#store-mode-author-nsfw').value.trim();
+      const keywords = wrapper.querySelector('#store-mode-author-keywords').value.trim();
+      item.keywords = keywords ? keywords.split(',').map(k => k.trim()).filter(Boolean) : [];
       renderAuthorList();
       saveSettings();
     });
@@ -614,6 +753,9 @@
       const state = getChatState();
       state.activeBlueprintId = blueprintActive.value || null;
       state.currentBeatIndex = 0;
+      state.currentSceneIndex = 0;
+      state.pacingMode = state.activeBlueprintId ? 'scenario' : 'story';
+      state.storyComplete = false;
       await saveChatState();
     });
 
@@ -621,6 +763,9 @@
       const state = getChatState();
       state.activeBlueprintId = null;
       state.currentBeatIndex = 0;
+      state.currentSceneIndex = 0;
+      state.pacingMode = 'story';
+      state.storyComplete = false;
       blueprintActive.value = '';
       await saveChatState();
     });
@@ -654,6 +799,9 @@
     wrapper.querySelector('#store-mode-flag-authors').checked = settings.featureFlags.authorStyles;
     wrapper.querySelector('#store-mode-flag-blueprints').checked = settings.featureFlags.blueprints;
     wrapper.querySelector('#store-mode-flag-extras').checked = settings.featureFlags.extras;
+    wrapper.querySelector('#store-mode-flag-nsfw').checked = settings.nsfwAuthorStyle;
+
+    arcLengthInput.value = settings.arcLengthDefault;
 
     wrapper.querySelector('#store-mode-flag-arcs').addEventListener('change', (e) => {
       settings.featureFlags.storyArcs = e.target.checked;
@@ -669,6 +817,16 @@
     });
     wrapper.querySelector('#store-mode-flag-extras').addEventListener('change', (e) => {
       settings.featureFlags.extras = e.target.checked;
+      saveSettings();
+    });
+
+    wrapper.querySelector('#store-mode-flag-nsfw').addEventListener('change', (e) => {
+      settings.nsfwAuthorStyle = e.target.checked;
+      saveSettings();
+    });
+
+    arcLengthInput.addEventListener('change', (e) => {
+      settings.arcLengthDefault = Math.max(parseInt(e.target.value || settings.arcLengthDefault, 10) || settings.arcLengthDefault, 1);
       saveSettings();
     });
 
@@ -770,6 +928,78 @@
     }
   }
 
+  function parseStorySignals(text) {
+    const signals = [];
+    let cleanText = text;
+    const patterns = [
+      { type: 'BEAT', regex: /@@BEAT:(\d+)@@/g },
+      { type: 'SKIP', regex: /@@SKIP:(\d+)@@/g },
+      { type: 'NEXT_SCENE', regex: /@@NEXT_SCENE@@/g },
+      { type: 'STORY_COMPLETE', regex: /@@STORY_COMPLETE@@/g }
+    ];
+    patterns.forEach((pattern) => {
+      const matches = [...cleanText.matchAll(pattern.regex)];
+      matches.forEach((match) => {
+        signals.push({ type: pattern.type, value: match[1] });
+      });
+      cleanText = cleanText.replace(pattern.regex, '');
+    });
+    return { cleanText: cleanText.trim(), signals };
+  }
+
+  async function onUserMessageRendered() {
+    const settings = getSettings();
+    if (!settings.enabled || !settings.featureFlags.storyArcs) return;
+    const state = getChatState();
+    if (!state.activeArcId || state.pacingMode !== 'story') return;
+    if (state.storyComplete) return;
+    state.currentStep = (state.currentStep || 0) + 1;
+    if (state.currentStep >= state.arcLength) {
+      state.storyComplete = true;
+    }
+    await saveChatState();
+  }
+
+  async function onMessageReceived(messageId) {
+    const settings = getSettings();
+    if (!settings.enabled) return;
+    const state = getChatState();
+    if (state.pacingMode !== 'scenario') return;
+
+    const ctx = SillyTavern.getContext();
+    const chat = ctx.chat;
+    if (!chat || typeof messageId !== 'number') return;
+    const message = chat[messageId];
+    if (!message) return;
+
+    const text = message.mes || message.text || '';
+    const { cleanText, signals } = parseStorySignals(text);
+    if (!signals.length) return;
+
+    message.mes = cleanText;
+    if (ctx.saveChatConditional) {
+      ctx.saveChatConditional();
+    } else if (ctx.saveMetadata) {
+      await ctx.saveMetadata();
+    }
+
+    signals.forEach((signal) => {
+      if (signal.type === 'BEAT' || signal.type === 'SKIP') {
+        const beatIndex = Math.max(parseInt(signal.value || '0', 10), 0);
+        state.currentBeatIndex = Math.max(state.currentBeatIndex || 0, beatIndex);
+      }
+      if (signal.type === 'NEXT_SCENE') {
+        state.currentSceneIndex = (state.currentSceneIndex || 0) + 1;
+        state.currentBeatIndex = 0;
+      }
+      if (signal.type === 'STORY_COMPLETE') {
+        state.storyComplete = true;
+      }
+    });
+
+    await saveChatState();
+  }
+
   function downloadJson(data, filename) {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -845,6 +1075,12 @@
 
     const { eventSource, event_types } = SillyTavern.getContext();
     eventSource.on(event_types.APP_READY, renderUI);
+    if (event_types.USER_MESSAGE_RENDERED) {
+      eventSource.on(event_types.USER_MESSAGE_RENDERED, onUserMessageRendered);
+    }
+    if (event_types.MESSAGE_RECEIVED) {
+      eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
+    }
   }
 
   init();

@@ -124,7 +124,10 @@ store-mode/
 8) QA: test install via Git URL; verify persistence across chats and sessions.
 
 ## Progress
-- Completed: Steps 1–7 (scaffold, seeding/helpers, UI, prompt injection, wizard, export/import, extras).\n+- Pending: Step 8 (QA/install verification).\n+- Follow-up: Populate `data/story_arcs.json` and `data/author_styles.json` with the 40+ starter entries.
+- Completed: Steps 1–7 (scaffold, seeding/helpers, UI, prompt injection, wizard, export/import, extras).
+- Completed: Seeded 40 Story Arcs + 40 Author Styles.
+- In progress: Alignment with Prompt-And-Circumstance/StoryMode (story type schema fields, phase prompts, arc length tracking, signal parsing).
+- Pending: Step 8 (QA/install verification).
 
 ## Testing Checklist
 - Install/enable extension from Git URL without errors.
