@@ -1,8 +1,16 @@
 (() => {
   const MODULE_NAME = 'store_mode';
   const MODULE_LABEL = 'Store Mode';
-  const scriptUrl = document.currentScript && document.currentScript.src ? document.currentScript.src : '';
-  const baseUrl = scriptUrl ? scriptUrl.slice(0, scriptUrl.lastIndexOf('/') + 1) : '/scripts/extensions/third-party/Store-Mode/';
+  const scriptElement = document.currentScript || Array.from(document.scripts).find((script) => {
+    if (!script.src) return false;
+    if (!script.src.includes('/scripts/extensions/third-party/')) return false;
+    if (!script.src.endsWith('/index.js')) return false;
+    return script.src.toLowerCase().includes('storymode');
+  });
+  const scriptUrl = scriptElement && scriptElement.src ? scriptElement.src : '';
+  const baseUrl = scriptUrl
+    ? scriptUrl.slice(0, scriptUrl.lastIndexOf('/') + 1)
+    : '/scripts/extensions/third-party/storymode/';
 
   const defaultSettings = Object.freeze({
     enabled: true,
