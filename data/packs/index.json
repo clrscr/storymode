@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "packs": [
+    {
+      "pack_id": "noir-starter",
+      "name": "Noir Starter Pack",
+      "version": "1.0.0",
+      "author": "Store Mode",
+      "description": "Noir story arcs, authors, and a sample blueprint.",
+      "file": "noir-starter.json"
+    }
+  ]
+}

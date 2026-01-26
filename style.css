@@ -137,6 +137,28 @@
   padding: 4px 0;
 }
 
+.store-mode-timeline-scene {
+  margin-bottom: 8px;
+  padding: 6px;
+  border: 1px solid var(--SmartThemeBorderColor, #444);
+  border-radius: 6px;
+}
+
+.store-mode-timeline-beat {
+  padding: 4px 0 4px 10px;
+  cursor: pointer;
+}
+
+.store-mode-pack-row {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--SmartThemeBorderColor, #444);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background: var(--SmartThemeBlurTint, #1b1b1b);
+}
+
 .store-mode-list button {
   display: block;
   width: 100%;

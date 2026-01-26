@@ -30,6 +30,15 @@
       favoritesOnly: false,
       sort: 'recent'
     },
+    autoBeat: {
+      enabled: false,
+      confirm: true,
+      threshold: 0.75,
+      autoAdvance: false
+    },
+    packs: {
+      installed: []
+    },
     promptOptions: {
       priority: 10,
       preview: true
@@ -444,6 +453,137 @@
     return lines.join('\n');
   }
 
+  function renderTimeline(container, blueprint, state) {
+    if (!container) return;
+    container.innerHTML = '';
+    if (!blueprint || !Array.isArray(blueprint.scenes)) {
+      container.textContent = 'No active blueprint.';
+      return;
+    }
+    blueprint.scenes.forEach((scene, sceneIndex) => {
+      const sceneRow = document.createElement('div');
+      sceneRow.className = 'store-mode-timeline-scene';
+      const header = document.createElement('div');
+      header.textContent = `Scene ${sceneIndex + 1}: ${scene.title || ''}`;
+      sceneRow.appendChild(header);
+
+      (scene.beats || []).forEach((beat, beatIndex) => {
+        const row = document.createElement('div');
+        row.className = 'store-mode-timeline-beat';
+        const key = `${sceneIndex}:${beatIndex}`;
+        const status = (state.beatState && state.beatState[key]) || 'pending';
+        const marker = status === 'complete' ? '✓' : status === 'skipped' ? 'x' : '→';
+        row.textContent = `[${marker}] ${beat.label || beat.title || 'Beat'} — ${beat.goal || ''}`;
+        row.addEventListener('click', async () => {
+          state.currentSceneIndex = sceneIndex;
+          state.currentBeatIndex = beatIndex;
+          await saveChatState();
+          updateExtensionPrompt();
+        });
+        sceneRow.appendChild(row);
+      });
+      container.appendChild(sceneRow);
+    });
+  }
+
+  async function loadPacksIndex() {
+    try {
+      const res = await fetch(`${baseUrl}data/packs/index.json`);
+      const json = await res.json();
+      return Array.isArray(json.packs) ? json.packs : [];
+    } catch (err) {
+      console.warn('[Store Mode] Failed to load packs index', err);
+      return [];
+    }
+  }
+
+  async function loadPack(packFile) {
+    const res = await fetch(`${baseUrl}data/packs/${packFile}`);
+    return res.json();
+  }
+
+  function markPackInstalled(packId) {
+    const settings = getSettings();
+    if (!settings.packs.installed.includes(packId)) {
+      settings.packs.installed.push(packId);
+      saveSettings();
+    }
+  }
+
+  function removePackInstalled(packId) {
+    const settings = getSettings();
+    settings.packs.installed = settings.packs.installed.filter(id => id !== packId);
+    saveSettings();
+  }
+
+  function mergeItems(existing, incoming, packId) {
+    const map = new Map(existing.map(item => [item.id, item]));
+    incoming.forEach(item => {
+      if (!item.id) return;
+      const clone = { ...item, source_pack_id: packId };
+      map.set(item.id, clone);
+    });
+    return Array.from(map.values());
+  }
+
+  async function installPack(pack) {
+    const settings = getSettings();
+    const data = await loadPack(pack.file);
+    if (data.includes?.story_arcs) {
+      settings.storyArcs = mergeItems(settings.storyArcs, data.includes.story_arcs, pack.pack_id);
+    }
+    if (data.includes?.author_styles) {
+      settings.authorStyles = mergeItems(settings.authorStyles, data.includes.author_styles, pack.pack_id);
+    }
+    if (data.includes?.blueprints) {
+      settings.blueprints = mergeItems(settings.blueprints, data.includes.blueprints, pack.pack_id);
+      data.includes.blueprints.forEach(bp => {
+        syncBlueprintToLibrary(bp).catch(() => {});
+      });
+    }
+    markPackInstalled(pack.pack_id);
+    saveSettings();
+  }
+
+  function uninstallPack(packId) {
+    const settings = getSettings();
+    settings.storyArcs = settings.storyArcs.filter(item => item.source_pack_id !== packId);
+    settings.authorStyles = settings.authorStyles.filter(item => item.source_pack_id !== packId);
+    settings.blueprints = settings.blueprints.filter(item => item.source_pack_id !== packId);
+    removePackInstalled(packId);
+    saveSettings();
+  }
+
+  async function renderPacksUI() {
+    if (!packList) return;
+    packList.innerHTML = '';
+    const packs = await loadPacksIndex();
+    const settings = getSettings();
+    packs.forEach(pack => {
+      const row = document.createElement('div');
+      row.className = 'store-mode-pack-row';
+      const title = document.createElement('div');
+      title.textContent = `${pack.name} (${pack.version})`;
+      const desc = document.createElement('div');
+      desc.textContent = pack.description || '';
+      const install = document.createElement('button');
+      const installed = settings.packs.installed.includes(pack.pack_id);
+      install.textContent = installed ? 'Remove' : 'Install';
+      install.addEventListener('click', async () => {
+        if (installed) {
+          uninstallPack(pack.pack_id);
+        } else {
+          await installPack(pack);
+        }
+        renderPacksUI();
+      });
+      row.appendChild(title);
+      row.appendChild(desc);
+      row.appendChild(install);
+      packList.appendChild(row);
+    });
+  }
+
   function parseBeatsText(text) {
     if (!text) return [];
     return text
@@ -818,6 +958,8 @@
             <div class="store-mode-actions">
               <button id="store-mode-blueprint-add-scene">Add Scene</button>
             </div>
+            <div class="store-mode-field"><label>Timeline</label></div>
+            <div class="store-mode-list" id="store-mode-blueprint-timeline"></div>
             <div class="store-mode-field"><label>Beat Checklist</label></div>
             <div class="store-mode-list" id="store-mode-blueprint-checklist"></div>
             <div class="store-mode-actions">
@@ -853,6 +995,21 @@
         <div class="store-mode-field">
           <label><input type="checkbox" id="store-mode-flag-auto-next" /> Auto “What’s Next” on Completion</label>
         </div>
+        <div class="store-mode-field">
+          <label><input type="checkbox" id="store-mode-flag-auto-beat" /> Auto-Beat Detection</label>
+        </div>
+        <div class="store-mode-field">
+          <label><input type="checkbox" id="store-mode-flag-auto-beat-confirm" /> Confirm Auto-Beat</label>
+        </div>
+        <div class="store-mode-field">
+          <label>Auto-Beat Threshold</label>
+          <input id="store-mode-auto-beat-threshold" type="number" min="0" max="1" step="0.05" />
+        </div>
+        <div class="store-mode-field">
+          <label><input type="checkbox" id="store-mode-flag-auto-beat-advance" /> Auto-Advance on Beat Complete</label>
+        </div>
+        <div class="store-mode-field"><label>Preset Packs</label></div>
+        <div class="store-mode-list" id="store-mode-pack-list"></div>
         <div class="store-mode-actions">
           <button id="store-mode-run-summary">Generate Summary</button>
           <button id="store-mode-run-epilogue">Generate Epilogue</button>
@@ -916,6 +1073,12 @@
     const blueprintLibrarySort = wrapper.querySelector('#store-mode-blueprint-library-sort');
     const blueprintLibraryFavorites = wrapper.querySelector('#store-mode-blueprint-library-favorites');
     const blueprintChecklist = wrapper.querySelector('#store-mode-blueprint-checklist');
+    const blueprintTimeline = wrapper.querySelector('#store-mode-blueprint-timeline');
+    const packList = wrapper.querySelector('#store-mode-pack-list');
+    const autoBeatToggle = wrapper.querySelector('#store-mode-flag-auto-beat');
+    const autoBeatConfirm = wrapper.querySelector('#store-mode-flag-auto-beat-confirm');
+    const autoBeatThreshold = wrapper.querySelector('#store-mode-auto-beat-threshold');
+    const autoBeatAdvance = wrapper.querySelector('#store-mode-flag-auto-beat-advance');
     const profileArcSelect = wrapper.querySelector('#store-mode-profile-arc');
     const profileAuthorSelect = wrapper.querySelector('#store-mode-profile-author');
     const profileBlueprintSelect = wrapper.querySelector('#store-mode-profile-blueprint');
@@ -1621,6 +1784,10 @@
     wrapper.querySelector('#store-mode-flag-auto-epilogue').checked = settings.extrasOptions.autoEpilogue;
     wrapper.querySelector('#store-mode-flag-auto-summary').checked = settings.extrasOptions.autoSummary;
     wrapper.querySelector('#store-mode-flag-auto-next').checked = settings.extrasOptions.autoNext;
+    autoBeatToggle.checked = settings.autoBeat.enabled;
+    autoBeatConfirm.checked = settings.autoBeat.confirm;
+    autoBeatThreshold.value = settings.autoBeat.threshold;
+    autoBeatAdvance.checked = settings.autoBeat.autoAdvance;
     arcLengthInput.value = settings.arcLengthDefault;
 
     const bindCheckbox = (selector, setter) => {
@@ -1641,6 +1808,14 @@
     bindCheckbox('#store-mode-flag-auto-epilogue', (value) => { settings.extrasOptions.autoEpilogue = value; });
     bindCheckbox('#store-mode-flag-auto-summary', (value) => { settings.extrasOptions.autoSummary = value; });
     bindCheckbox('#store-mode-flag-auto-next', (value) => { settings.extrasOptions.autoNext = value; });
+    bindCheckbox('#store-mode-flag-auto-beat', (value) => { settings.autoBeat.enabled = value; });
+    bindCheckbox('#store-mode-flag-auto-beat-confirm', (value) => { settings.autoBeat.confirm = value; });
+    bindCheckbox('#store-mode-flag-auto-beat-advance', (value) => { settings.autoBeat.autoAdvance = value; });
+
+    autoBeatThreshold.addEventListener('change', () => {
+      settings.autoBeat.threshold = Math.min(Math.max(parseFloat(autoBeatThreshold.value || '0.75'), 0), 1);
+      saveSettings();
+    });
 
     arcLengthInput.addEventListener('change', (e) => {
       settings.arcLengthDefault = Math.max(parseInt(e.target.value || settings.arcLengthDefault, 10) || settings.arcLengthDefault, 1);
@@ -1721,6 +1896,9 @@
     renderBlueprintLibrary();
     syncActiveSelections();
     renderBeatChecklistUI();
+    renderPacksUI();
+    const activeBlueprint = settings.blueprints.find(item => item.id === getChatState().activeBlueprintId);
+    renderTimeline(blueprintTimeline, activeBlueprint, getChatState());
   }
 
   async function runBlueprintWizard() {
@@ -2029,6 +2207,10 @@
 
     const text = message.mes || message.text || '';
     const { cleanText, signals } = parseStorySignals(text);
+    if (!signals.length && settings.autoBeat.enabled) {
+      await maybeAutoDetectBeat(text);
+      return;
+    }
     if (!signals.length) return;
 
     message.mes = cleanText;
@@ -2060,6 +2242,46 @@
     if (state.storyComplete) {
       handleCompletionExtras().catch(err => console.warn('[Store Mode] Auto extras failed', err));
     }
+  }
+
+  async function maybeAutoDetectBeat(text) {
+    const settings = getSettings();
+    const state = getChatState();
+    const blueprint = settings.blueprints.find(item => item.id === state.activeBlueprintId);
+    if (!blueprint) return;
+    const beat = getCurrentBeat(blueprint, state.currentBeatIndex);
+    if (!beat) return;
+
+    const prompt = `Decide if the current beat is complete. Respond with JSON: {\"complete\": true/false, \"confidence\": 0-1, \"reason\": \"...\"}.\nBeat goal: ${beat.goal || ''}\nBeat prompt: ${beat.prompt || ''}\nMessage: ${text}`;
+
+    let response = '';
+    if (settings.llmProfiles.blueprint) {
+      response = await sendProfileRequest(settings.llmProfiles.blueprint, prompt, 200);
+    }
+    if (!response) return;
+    let parsed;
+    try {
+      parsed = JSON.parse(response);
+    } catch (err) {
+      return;
+    }
+    const confidence = Number(parsed.confidence || 0);
+    if (confidence < settings.autoBeat.threshold) return;
+    if (!parsed.complete) return;
+
+    if (settings.autoBeat.confirm) {
+      const ok = window.confirm(`Mark beat complete?\\n${beat.label || beat.goal || ''}\\nReason: ${parsed.reason || ''}`);
+      if (!ok) return;
+    }
+
+    if (!state.beatState) state.beatState = {};
+    const key = `${state.currentSceneIndex || 0}:${state.currentBeatIndex}`;
+    state.beatState[key] = 'complete';
+    if (settings.autoBeat.autoAdvance) {
+      state.currentBeatIndex += 1;
+    }
+    await saveChatState();
+    updateExtensionPrompt();
   }
 
   function downloadJson(data, filename) {
@@ -2158,10 +2380,10 @@
     }
     if (event_types.CHAT_CHANGED) {
       eventSource.on(event_types.CHAT_CHANGED, () => {
-        const panel = document.getElementById('store-mode-settings');
-        if (!panel) return;
-        const settings = getSettings();
-        const state = getChatState();
+      const panel = document.getElementById('store-mode-settings');
+      if (!panel) return;
+      const settings = getSettings();
+      const state = getChatState();
         const arcActive = panel.querySelector('#store-mode-active-arc');
         const authorActive = panel.querySelector('#store-mode-active-author');
         const blueprintActive = panel.querySelector('#store-mode-active-blueprint');
@@ -2180,6 +2402,10 @@
         }
         if (promptPreviewArea && promptPreviewToggle && promptPreviewToggle.checked) {
           promptPreviewArea.value = buildInjection();
+        }
+        if (blueprintTimeline) {
+          const blueprint = settings.blueprints.find(item => item.id === state.activeBlueprintId);
+          renderTimeline(blueprintTimeline, blueprint, state);
         }
       });
     }

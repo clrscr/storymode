@@ -1,0 +1,48 @@
+{
+  "pack_id": "noir-starter",
+  "name": "Noir Starter Pack",
+  "version": "1.0.0",
+  "author": "Store Mode",
+  "includes": {
+    "story_arcs": [
+      {
+        "id": "arc_noir_detective",
+        "title": "Noir Detective",
+        "genre": "Noir / Mystery",
+        "tone": "Cynical, moody, rain-soaked",
+        "pacing": "Measured investigation → sudden violence → uneasy resolution",
+        "tropes": "Hardboiled PI, femme fatale, corrupt officials, smoky bars",
+        "guidance": "Use sparse, sharp prose. Emphasize moral ambiguity and urban grit. Reveal clues gradually with misdirection."
+      }
+    ],
+    "author_styles": [
+      {
+        "id": "auth_dashiell_hammett",
+        "name": "Dashiell Hammett",
+        "style": "Lean, tough, noir realism.",
+        "voice": "Dry, sharp.",
+        "notes": "Let dialogue carry tension."
+      }
+    ],
+    "blueprints": [
+      {
+        "id": "blueprint_noir_starter",
+        "title": "The Violet Ledger",
+        "logline": "A private investigator hunts the truth behind a vanished ledger that everyone wants destroyed.",
+        "genre": "Noir",
+        "core_premise": "A missing ledger ties a city’s power players to a decades-old crime.",
+        "setting": { "location": "Rain-soaked city", "time_period": "Late 1940s", "atmosphere": "Smoky, tense" },
+        "protagonist_group": { "description": "A weary PI and a reluctant informant." },
+        "antagonistic_forces": { "description": "Corrupt officials and a private security firm." },
+        "arc_structure": { "description": "Case opens with a false lead, escalates through betrayal, ends in a bitter reveal." },
+        "tone_and_style": { "description": "Cynical, clipped prose with heavy atmosphere." },
+        "content_boundaries": "Violence: moderate. Romance: light.",
+        "opening_message": "The rain doesn't stop in this town; it just changes rhythm. The call came in at 2 a.m., the kind that promised more trouble than money.",
+        "scenes": [
+          { "title": "The Lead", "beats": [ { "label": "Meet", "goal": "Get the first clue", "prompt": "An informant hints at the ledger’s last known location." } ] },
+          { "title": "The Sting", "beats": [ { "label": "Betrayal", "goal": "Discover the double-cross", "prompt": "Someone close sells you out." } ] }
+        ]
+      }
+    ]
+  }
+}
