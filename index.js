@@ -25,7 +25,10 @@
     blueprintLibrary: {
       enabled: true,
       manifestLoaded: false,
-      manifest: null
+      manifest: null,
+      view: 'grid',
+      favoritesOnly: false,
+      sort: 'recent'
     },
     promptOptions: {
       priority: 10,
@@ -431,6 +434,14 @@
     const ctx = SillyTavern.getContext();
     const settings = getSettings();
     const injection = buildInjection();
+    const panel = document.getElementById('store-mode-settings');
+    if (panel) {
+      const previewToggle = panel.querySelector('#store-mode-flag-preview');
+      const previewArea = panel.querySelector('#store-mode-prompt-preview');
+      if (previewToggle && previewArea && previewToggle.checked) {
+        previewArea.value = injection;
+      }
+    }
     if (typeof ctx.setExtensionPrompt === 'function') {
       if (ctx.extension_prompt_types && ctx.extension_prompt_roles) {
         ctx.setExtensionPrompt(
@@ -642,6 +653,17 @@
             </div>
             <div class="store-mode-list" id="store-mode-blueprint-list"></div>
             <div class="store-mode-field"><label>Library</label></div>
+            <div class="store-mode-field store-mode-actions">
+              <select id="store-mode-blueprint-library-view">
+                <option value="grid">Grid</option>
+                <option value="list">List</option>
+              </select>
+              <select id="store-mode-blueprint-library-sort">
+                <option value="recent">Recent</option>
+                <option value="title">Title</option>
+              </select>
+              <label><input type="checkbox" id="store-mode-blueprint-library-favorites" /> Favorites</label>
+            </div>
             <div class="store-mode-field"><input id="store-mode-blueprint-library-search" placeholder="Search library..." /></div>
             <div class="store-mode-list" id="store-mode-blueprint-library"></div>
             <div class="store-mode-actions">
@@ -753,6 +775,9 @@
     const blueprintSceneInput = wrapper.querySelector('#store-mode-blueprint-scene');
     const blueprintLibraryList = wrapper.querySelector('#store-mode-blueprint-library');
     const blueprintLibrarySearch = wrapper.querySelector('#store-mode-blueprint-library-search');
+    const blueprintLibraryView = wrapper.querySelector('#store-mode-blueprint-library-view');
+    const blueprintLibrarySort = wrapper.querySelector('#store-mode-blueprint-library-sort');
+    const blueprintLibraryFavorites = wrapper.querySelector('#store-mode-blueprint-library-favorites');
     const promptPriorityInput = wrapper.querySelector('#store-mode-prompt-priority');
     const promptPreviewToggle = wrapper.querySelector('#store-mode-flag-preview');
     const promptPreviewArea = wrapper.querySelector('#store-mode-prompt-preview');
@@ -855,6 +880,13 @@
       blueprintLibraryList.innerHTML = '';
       const settings = getSettings();
       const manifest = settings.blueprintLibrary.manifest;
+      const viewMode = settings.blueprintLibrary.view || 'grid';
+      const favoritesOnly = settings.blueprintLibrary.favoritesOnly;
+      const sortMode = settings.blueprintLibrary.sort || 'recent';
+
+      blueprintLibraryList.classList.toggle('store-mode-library-grid', viewMode === 'grid');
+      blueprintLibraryList.classList.toggle('store-mode-library-list', viewMode !== 'grid');
+
       if (!manifest || !Array.isArray(manifest.blueprints) || !manifest.blueprints.length) {
         const empty = document.createElement('div');
         empty.textContent = 'No library items yet';
@@ -862,15 +894,35 @@
         return;
       }
       const query = (blueprintLibrarySearch && blueprintLibrarySearch.value || '').toLowerCase();
-      const entries = manifest.blueprints.filter(entry => {
+      let entries = manifest.blueprints.filter(entry => {
         if (!query) return true;
         return (entry.title || '').toLowerCase().includes(query);
       });
+      if (favoritesOnly) {
+        entries = entries.filter(entry => entry.favorite);
+      }
+      if (sortMode === 'title') {
+        entries.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      } else {
+        entries.sort((a, b) => (b.modified_at || '').localeCompare(a.modified_at || ''));
+      }
+
       entries.forEach(entry => {
-        const row = document.createElement('div');
-        row.className = 'store-mode-library-row';
-        const button = document.createElement('button');
-        button.textContent = entry.title || entry.blueprint_id;
+        const card = document.createElement('div');
+        card.className = viewMode === 'grid' ? 'store-mode-library-card' : 'store-mode-library-row';
+
+        const cover = document.createElement('img');
+        cover.className = 'store-mode-library-cover';
+        cover.alt = entry.title || 'Blueprint cover';
+        cover.src = entry.filename ? `${toFileUrl(entry.filename)}?t=${encodeURIComponent(entry.modified_at || '')}` : '';
+
+        const title = document.createElement('div');
+        title.className = 'store-mode-library-title';
+        title.textContent = entry.title || entry.blueprint_id;
+
+        const actions = document.createElement('div');
+        actions.className = 'store-mode-library-actions';
+
         const fav = document.createElement('button');
         fav.textContent = entry.favorite ? '★' : '☆';
         fav.title = 'Toggle favorite';
@@ -880,8 +932,9 @@
           await saveBlueprintLibrary();
           renderBlueprintLibrary();
         });
+
         const load = document.createElement('button');
-        load.textContent = 'Load';
+        load.textContent = 'Open';
         load.addEventListener('click', async (event) => {
           event.stopPropagation();
           const blueprint = await loadBlueprintFromLibrary(entry);
@@ -893,20 +946,34 @@
           saveSettings();
           updateExtensionPrompt();
         });
-        row.appendChild(button);
-        row.appendChild(fav);
-        row.appendChild(load);
-        row.addEventListener('click', async () => {
+
+        const play = document.createElement('button');
+        play.textContent = 'Play';
+        play.addEventListener('click', async (event) => {
+          event.stopPropagation();
           const blueprint = await loadBlueprintFromLibrary(entry);
           if (!blueprint) return;
+          const state = getChatState();
           upsertBlueprint(settings.blueprints, blueprint);
           selectedBlueprintId = blueprint.id;
-          fillBlueprintForm(blueprint);
-          renderBlueprintList();
+          state.activeBlueprintId = blueprint.id;
+          state.currentBeatIndex = 0;
+          state.currentSceneIndex = 0;
+          state.pacingMode = 'scenario';
+          state.storyComplete = false;
+          await saveChatState();
           saveSettings();
           updateExtensionPrompt();
         });
-        blueprintLibraryList.appendChild(row);
+
+        actions.appendChild(fav);
+        actions.appendChild(load);
+        actions.appendChild(play);
+
+        card.appendChild(cover);
+        card.appendChild(title);
+        card.appendChild(actions);
+        blueprintLibraryList.appendChild(card);
       });
     }
 
@@ -1206,6 +1273,8 @@
         fillBlueprintForm(blueprint);
         renderBlueprintList();
         saveSettings();
+        syncBlueprintToLibrary(blueprint).catch(err => console.warn('[Store Mode] Blueprint library sync failed', err));
+        renderBlueprintLibrary();
       } catch (err) {
         console.warn('[Store Mode] PNG import failed', err);
       }
@@ -1222,6 +1291,33 @@
 
     if (blueprintLibrarySearch) {
       blueprintLibrarySearch.addEventListener('input', renderBlueprintLibrary);
+    }
+
+    if (blueprintLibraryView) {
+      blueprintLibraryView.value = settings.blueprintLibrary.view || 'grid';
+      blueprintLibraryView.addEventListener('change', () => {
+        settings.blueprintLibrary.view = blueprintLibraryView.value;
+        saveSettings();
+        renderBlueprintLibrary();
+      });
+    }
+
+    if (blueprintLibrarySort) {
+      blueprintLibrarySort.value = settings.blueprintLibrary.sort || 'recent';
+      blueprintLibrarySort.addEventListener('change', () => {
+        settings.blueprintLibrary.sort = blueprintLibrarySort.value;
+        saveSettings();
+        renderBlueprintLibrary();
+      });
+    }
+
+    if (blueprintLibraryFavorites) {
+      blueprintLibraryFavorites.checked = settings.blueprintLibrary.favoritesOnly;
+      blueprintLibraryFavorites.addEventListener('change', (e) => {
+        settings.blueprintLibrary.favoritesOnly = !!e.target.checked;
+        saveSettings();
+        renderBlueprintLibrary();
+      });
     }
 
     wrapper.querySelector('#store-mode-blueprint-advance-beat').addEventListener('click', async () => {
@@ -1470,6 +1566,8 @@
       saveSettings();
     } catch (err) {
       settings.blueprintLibrary.manifestLoaded = false;
+      settings.blueprintLibrary.manifest = { version: 1, blueprints: [] };
+      saveSettings();
     }
   }
 
@@ -1514,7 +1612,8 @@
       title: blueprint.title || '',
       created_at: existing ? existing.created_at : now,
       modified_at: now,
-      filename: filename
+      filename: filename,
+      favorite: existing ? !!existing.favorite : false
     };
     if (existing) {
       Object.assign(existing, entry);
