@@ -127,6 +127,11 @@
   const FILE_PREFIX = 'storymode-';
   const MANIFEST_FILENAME = 'storymode-manifest.json';
 
+  function getConnectionProfiles() {
+    const { extensionSettings } = SillyTavern.getContext();
+    return extensionSettings?.connectionManager?.profiles || [];
+  }
+
   function ensurePrefixed(name) {
     if (name.startsWith(FILE_PREFIX)) return name;
     return FILE_PREFIX + name;
@@ -407,7 +412,16 @@
           ? 'Use @@BEAT:N@@, @@NEXT_SCENE@@, @@STORY_COMPLETE@@ signals at the end of responses.'
           : '';
         const checklist = buildBeatChecklist(blueprint, state);
-        sections.push(`Scenario Blueprint\nTitle: ${blueprint.title || ''}\nCurrent Beat: ${beat.label || ''}\nGoal: ${beat.goal || ''}\nPrompt: ${beat.prompt || ''}\n${signalHint}\n${checklist ? `Checklist:\n${checklist}` : ''}`.trim());
+        const details = [
+          blueprint.core_premise ? `Premise: ${blueprint.core_premise}` : '',
+          blueprint.setting ? `Setting: ${[blueprint.setting.location, blueprint.setting.time_period, blueprint.setting.atmosphere].filter(Boolean).join(' | ')}` : '',
+          blueprint.protagonist_group?.description ? `Protagonists: ${blueprint.protagonist_group.description}` : '',
+          blueprint.antagonistic_forces?.description ? `Antagonists: ${blueprint.antagonistic_forces.description}` : '',
+          blueprint.arc_structure?.description ? `Arc: ${blueprint.arc_structure.description}` : '',
+          blueprint.tone_and_style?.description ? `Tone: ${blueprint.tone_and_style.description}` : '',
+          blueprint.content_boundaries ? `Boundaries: ${blueprint.content_boundaries}` : ''
+        ].filter(Boolean).join('\n');
+        sections.push(`Scenario Blueprint\nTitle: ${blueprint.title || ''}\n${details}\nCurrent Beat: ${beat.label || ''}\nGoal: ${beat.goal || ''}\nPrompt: ${beat.prompt || ''}\n${signalHint}\n${checklist ? `Checklist:\n${checklist}` : ''}`.trim());
       }
     }
 
@@ -428,6 +442,103 @@
       });
     });
     return lines.join('\n');
+  }
+
+  function parseBeatsText(text) {
+    if (!text) return [];
+    return text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => {
+        const [label = '', goal = '', prompt = ''] = line.split('|').map(part => part.trim());
+        return { label, goal, prompt };
+      });
+  }
+
+  function stringifyBeats(beats) {
+    return (beats || []).map(beat => {
+      const label = beat.label || '';
+      const goal = beat.goal || '';
+      const prompt = beat.prompt || '';
+      return [label, goal, prompt].join(' | ').trim();
+    }).join('\n');
+  }
+
+  function buildScenesEditor(container, scenes) {
+    container.innerHTML = '';
+    (scenes || []).forEach((scene, index) => {
+      const row = document.createElement('div');
+      row.className = 'store-mode-scene';
+
+      const titleField = document.createElement('input');
+      titleField.value = scene.title || `Scene ${index + 1}`;
+      titleField.dataset.role = 'scene-title';
+
+      const beatsField = document.createElement('textarea');
+      beatsField.rows = 4;
+      beatsField.dataset.role = 'scene-beats';
+      beatsField.value = stringifyBeats(scene.beats || []);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Remove Scene';
+      remove.addEventListener('click', () => {
+        row.remove();
+      });
+
+      row.appendChild(titleField);
+      row.appendChild(beatsField);
+      row.appendChild(remove);
+      container.appendChild(row);
+    });
+  }
+
+  function readScenesEditor(container) {
+    const scenes = [];
+    const rows = Array.from(container.querySelectorAll('.store-mode-scene'));
+    rows.forEach(row => {
+      const title = row.querySelector('[data-role="scene-title"]')?.value?.trim() || '';
+      const beatsText = row.querySelector('[data-role="scene-beats"]')?.value || '';
+      const beats = parseBeatsText(beatsText);
+      scenes.push({ title, beats });
+    });
+    return scenes;
+  }
+
+  async function sendProfileRequest(profileId, prompt, responseLength = 512) {
+    if (!profileId) return '';
+    const service = window.ConnectionManagerRequestService;
+    if (!service || typeof service.sendRequest !== 'function') return '';
+    const messages = [{ role: 'user', content: prompt }];
+    const result = await service.sendRequest(profileId, messages, responseLength, {});
+    return (result && (result.text || result.content)) ? (result.text || result.content) : '';
+  }
+
+  async function startNewChatWithBlueprint(blueprint) {
+    const ctx = SillyTavern.getContext();
+    if (typeof ctx.doNewChat === 'function') {
+      await ctx.doNewChat();
+    }
+    setTimeout(async () => {
+      const state = getChatState();
+      state.activeBlueprintId = blueprint.id;
+      state.currentBeatIndex = 0;
+      state.currentSceneIndex = 0;
+      state.pacingMode = 'scenario';
+      state.storyComplete = false;
+      await saveChatState();
+      updateExtensionPrompt();
+      if (blueprint.opening_message && typeof ctx.addOneMessage === 'function') {
+        ctx.addOneMessage({
+          is_user: false,
+          is_system: false,
+          name: 'Store Mode',
+          send_date: Date.now(),
+          mes: blueprint.opening_message
+        });
+      }
+    }, 300);
   }
 
   function updateExtensionPrompt() {
@@ -453,6 +564,12 @@
         );
       } else {
         ctx.setExtensionPrompt(MODULE_NAME, injection);
+      }
+    }
+    if (panel) {
+      const checklist = panel.querySelector('#store-mode-blueprint-checklist');
+      if (checklist) {
+        checklist.dispatchEvent(new Event('storemode-refresh', { bubbles: true }));
       }
     }
   }
@@ -686,7 +803,23 @@
             <div class="store-mode-field"><label>Title</label><input id="store-mode-blueprint-title" /></div>
             <div class="store-mode-field"><label>Logline</label><textarea id="store-mode-blueprint-logline" rows="2"></textarea></div>
             <div class="store-mode-field"><label>Genre</label><input id="store-mode-blueprint-genre" /></div>
-            <div class="store-mode-field"><label>Scenes/Beats (JSON)</label><textarea id="store-mode-blueprint-scenes" rows="10"></textarea></div>
+            <div class="store-mode-field"><label>Core Premise</label><textarea id="store-mode-blueprint-premise" rows="2"></textarea></div>
+            <div class="store-mode-field"><label>Setting (Location)</label><input id="store-mode-blueprint-setting-location" /></div>
+            <div class="store-mode-field"><label>Setting (Time Period)</label><input id="store-mode-blueprint-setting-time" /></div>
+            <div class="store-mode-field"><label>Setting (Atmosphere)</label><input id="store-mode-blueprint-setting-atmosphere" /></div>
+            <div class="store-mode-field"><label>Protagonist Group</label><textarea id="store-mode-blueprint-protagonist" rows="2"></textarea></div>
+            <div class="store-mode-field"><label>Antagonistic Forces</label><textarea id="store-mode-blueprint-antagonist" rows="2"></textarea></div>
+            <div class="store-mode-field"><label>Arc Structure</label><textarea id="store-mode-blueprint-arc-structure" rows="2"></textarea></div>
+            <div class="store-mode-field"><label>Tone and Style</label><textarea id="store-mode-blueprint-tone-style" rows="2"></textarea></div>
+            <div class="store-mode-field"><label>Content Boundaries</label><input id="store-mode-blueprint-content-boundaries" /></div>
+            <div class="store-mode-field"><label>Opening Message</label><textarea id="store-mode-blueprint-opening" rows="4"></textarea></div>
+            <div class="store-mode-field"><label>Scenes & Beats</label></div>
+            <div id="store-mode-blueprint-scenes-editor"></div>
+            <div class="store-mode-actions">
+              <button id="store-mode-blueprint-add-scene">Add Scene</button>
+            </div>
+            <div class="store-mode-field"><label>Beat Checklist</label></div>
+            <div class="store-mode-list" id="store-mode-blueprint-checklist"></div>
             <div class="store-mode-actions">
               <button id="store-mode-blueprint-save">Save</button>
               <button id="store-mode-blueprint-generate">Wizard (LLM)</button>
@@ -725,6 +858,10 @@
           <button id="store-mode-run-epilogue">Generate Epilogue</button>
           <button id="store-mode-run-next">Generate What's Next</button>
         </div>
+        <div class="store-mode-field"><label>LLM Profile (Arcs)</label><select id="store-mode-profile-arc"></select></div>
+        <div class="store-mode-field"><label>LLM Profile (Authors)</label><select id="store-mode-profile-author"></select></div>
+        <div class="store-mode-field"><label>LLM Profile (Blueprints)</label><select id="store-mode-profile-blueprint"></select></div>
+        <div class="store-mode-field"><label>LLM Profile (Extras)</label><select id="store-mode-profile-extras"></select></div>
         <div class="store-mode-field">
           <label>Prompt Priority</label>
           <input id="store-mode-prompt-priority" type="number" min="-100" max="100" />
@@ -778,6 +915,11 @@
     const blueprintLibraryView = wrapper.querySelector('#store-mode-blueprint-library-view');
     const blueprintLibrarySort = wrapper.querySelector('#store-mode-blueprint-library-sort');
     const blueprintLibraryFavorites = wrapper.querySelector('#store-mode-blueprint-library-favorites');
+    const blueprintChecklist = wrapper.querySelector('#store-mode-blueprint-checklist');
+    const profileArcSelect = wrapper.querySelector('#store-mode-profile-arc');
+    const profileAuthorSelect = wrapper.querySelector('#store-mode-profile-author');
+    const profileBlueprintSelect = wrapper.querySelector('#store-mode-profile-blueprint');
+    const profileExtrasSelect = wrapper.querySelector('#store-mode-profile-extras');
     const promptPriorityInput = wrapper.querySelector('#store-mode-prompt-priority');
     const promptPreviewToggle = wrapper.querySelector('#store-mode-flag-preview');
     const promptPreviewArea = wrapper.querySelector('#store-mode-prompt-preview');
@@ -966,14 +1108,77 @@
           updateExtensionPrompt();
         });
 
+        const playNew = document.createElement('button');
+        playNew.textContent = 'New';
+        playNew.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          const blueprint = await loadBlueprintFromLibrary(entry);
+          if (!blueprint) return;
+          upsertBlueprint(settings.blueprints, blueprint);
+          selectedBlueprintId = blueprint.id;
+          saveSettings();
+          await startNewChatWithBlueprint(blueprint);
+        });
+
         actions.appendChild(fav);
         actions.appendChild(load);
         actions.appendChild(play);
+        actions.appendChild(playNew);
 
         card.appendChild(cover);
         card.appendChild(title);
         card.appendChild(actions);
         blueprintLibraryList.appendChild(card);
+      });
+    }
+
+    function renderBeatChecklistUI() {
+      if (!blueprintChecklist) return;
+      blueprintChecklist.innerHTML = '';
+      const settings = getSettings();
+      const state = getChatState();
+      const blueprint = settings.blueprints.find(item => item.id === state.activeBlueprintId);
+      if (!blueprint || !Array.isArray(blueprint.scenes)) {
+        blueprintChecklist.textContent = 'No active blueprint.';
+        return;
+      }
+      blueprint.scenes.forEach((scene, sceneIndex) => {
+        const sceneHeader = document.createElement('div');
+        sceneHeader.textContent = `Scene ${sceneIndex + 1}: ${scene.title || ''}`;
+        blueprintChecklist.appendChild(sceneHeader);
+        (scene.beats || []).forEach((beat, beatIndex) => {
+          const row = document.createElement('div');
+          row.className = 'store-mode-beat-row';
+          const key = `${sceneIndex}:${beatIndex}`;
+          const status = (state.beatState && state.beatState[key]) || 'pending';
+          const label = document.createElement('span');
+          label.textContent = `[${status}] ${beat.label || beat.title || 'Beat'}`;
+
+          const complete = document.createElement('button');
+          complete.textContent = '✓';
+          complete.addEventListener('click', async () => {
+            if (!state.beatState) state.beatState = {};
+            state.beatState[key] = 'complete';
+            await saveChatState();
+            renderBeatChecklistUI();
+            updateExtensionPrompt();
+          });
+
+          const skip = document.createElement('button');
+          skip.textContent = 'x';
+          skip.addEventListener('click', async () => {
+            if (!state.beatState) state.beatState = {};
+            state.beatState[key] = 'skipped';
+            await saveChatState();
+            renderBeatChecklistUI();
+            updateExtensionPrompt();
+          });
+
+          row.appendChild(label);
+          row.appendChild(complete);
+          row.appendChild(skip);
+          blueprintChecklist.appendChild(row);
+        });
       });
     }
 
@@ -1005,7 +1210,18 @@
       wrapper.querySelector('#store-mode-blueprint-title').value = item.title || '';
       wrapper.querySelector('#store-mode-blueprint-logline').value = item.logline || '';
       wrapper.querySelector('#store-mode-blueprint-genre').value = item.genre || '';
-      wrapper.querySelector('#store-mode-blueprint-scenes').value = JSON.stringify(item.scenes || [], null, 2);
+      wrapper.querySelector('#store-mode-blueprint-premise').value = item.core_premise || '';
+      wrapper.querySelector('#store-mode-blueprint-setting-location').value = item.setting?.location || '';
+      wrapper.querySelector('#store-mode-blueprint-setting-time').value = item.setting?.time_period || '';
+      wrapper.querySelector('#store-mode-blueprint-setting-atmosphere').value = item.setting?.atmosphere || '';
+      wrapper.querySelector('#store-mode-blueprint-protagonist').value = item.protagonist_group?.description || '';
+      wrapper.querySelector('#store-mode-blueprint-antagonist').value = item.antagonistic_forces?.description || '';
+      wrapper.querySelector('#store-mode-blueprint-arc-structure').value = item.arc_structure?.description || '';
+      wrapper.querySelector('#store-mode-blueprint-tone-style').value = item.tone_and_style?.description || '';
+      wrapper.querySelector('#store-mode-blueprint-content-boundaries').value = item.content_boundaries || '';
+      wrapper.querySelector('#store-mode-blueprint-opening').value = item.opening_message || '';
+      const sceneEditor = wrapper.querySelector('#store-mode-blueprint-scenes-editor');
+      buildScenesEditor(sceneEditor, item.scenes || []);
     }
 
     wrapper.querySelector('#store-mode-arc-new').addEventListener('click', () => {
@@ -1096,6 +1312,9 @@
         settings.storyArcs = items;
         renderArcList();
         saveSettings();
+      } else if (items !== null) {
+        const { toastr } = SillyTavern.getContext();
+        toastr && toastr.warning('Store Mode: Story Arcs import failed.');
       }
     });
 
@@ -1169,6 +1388,9 @@
         settings.authorStyles = items;
         renderAuthorList();
         saveSettings();
+      } else if (items !== null) {
+        const { toastr } = SillyTavern.getContext();
+        toastr && toastr.warning('Store Mode: Author Styles import failed.');
       }
     });
 
@@ -1178,6 +1400,14 @@
         title: 'New Blueprint',
         logline: '',
         genre: '',
+        core_premise: '',
+        setting: { location: '', time_period: '', atmosphere: '' },
+        protagonist_group: { description: '' },
+        antagonistic_forces: { description: '' },
+        arc_structure: { description: '' },
+        tone_and_style: { description: '' },
+        content_boundaries: '',
+        opening_message: '',
         scenes: []
       };
       settings.blueprints.unshift(newItem);
@@ -1194,11 +1424,28 @@
       item.title = wrapper.querySelector('#store-mode-blueprint-title').value.trim();
       item.logline = wrapper.querySelector('#store-mode-blueprint-logline').value.trim();
       item.genre = wrapper.querySelector('#store-mode-blueprint-genre').value.trim();
-      try {
-        item.scenes = JSON.parse(wrapper.querySelector('#store-mode-blueprint-scenes').value || '[]');
-      } catch (err) {
-        console.warn('[Store Mode] Invalid blueprint scenes JSON', err);
-      }
+      item.core_premise = wrapper.querySelector('#store-mode-blueprint-premise').value.trim();
+      item.setting = {
+        location: wrapper.querySelector('#store-mode-blueprint-setting-location').value.trim(),
+        time_period: wrapper.querySelector('#store-mode-blueprint-setting-time').value.trim(),
+        atmosphere: wrapper.querySelector('#store-mode-blueprint-setting-atmosphere').value.trim()
+      };
+      item.protagonist_group = {
+        description: wrapper.querySelector('#store-mode-blueprint-protagonist').value.trim()
+      };
+      item.antagonistic_forces = {
+        description: wrapper.querySelector('#store-mode-blueprint-antagonist').value.trim()
+      };
+      item.arc_structure = {
+        description: wrapper.querySelector('#store-mode-blueprint-arc-structure').value.trim()
+      };
+      item.tone_and_style = {
+        description: wrapper.querySelector('#store-mode-blueprint-tone-style').value.trim()
+      };
+      item.content_boundaries = wrapper.querySelector('#store-mode-blueprint-content-boundaries').value.trim();
+      item.opening_message = wrapper.querySelector('#store-mode-blueprint-opening').value.trim();
+      const sceneEditor = wrapper.querySelector('#store-mode-blueprint-scenes-editor');
+      item.scenes = readScenesEditor(sceneEditor);
       renderBlueprintList();
       saveSettings();
       syncBlueprintToLibrary(item).catch(err => console.warn('[Store Mode] Blueprint library sync failed', err));
@@ -1224,6 +1471,7 @@
       await saveChatState();
       blueprintSceneInput.value = `Scene ${state.currentSceneIndex + 1} / Beat ${state.currentBeatIndex + 1}`;
       updateExtensionPrompt();
+      renderBeatChecklistUI();
     });
 
     wrapper.querySelector('#store-mode-blueprint-clear').addEventListener('click', async () => {
@@ -1237,6 +1485,7 @@
       await saveChatState();
       blueprintSceneInput.value = '';
       updateExtensionPrompt();
+      renderBeatChecklistUI();
     });
 
     wrapper.querySelector('#store-mode-blueprint-export').addEventListener('click', () => {
@@ -1257,6 +1506,9 @@
         settings.blueprints = items;
         renderBlueprintList();
         saveSettings();
+      } else if (items !== null) {
+        const { toastr } = SillyTavern.getContext();
+        toastr && toastr.warning('Store Mode: Blueprints import failed.');
       }
     });
 
@@ -1265,7 +1517,11 @@
       if (!file) return;
       try {
         const blueprint = await extractBlueprintFromPng(file);
-        if (!blueprint) return;
+        if (!blueprint) {
+          const { toastr } = SillyTavern.getContext();
+          toastr && toastr.warning('Store Mode: PNG does not contain blueprint data.');
+          return;
+        }
         const settings = getSettings();
         if (!blueprint.id) blueprint.id = makeId('blueprint');
         upsertBlueprint(settings.blueprints, blueprint);
@@ -1277,11 +1533,21 @@
         renderBlueprintLibrary();
       } catch (err) {
         console.warn('[Store Mode] PNG import failed', err);
+        const { toastr } = SillyTavern.getContext();
+        toastr && toastr.warning('Store Mode: PNG import failed.');
       }
     });
 
     wrapper.querySelector('#store-mode-blueprint-generate').addEventListener('click', () => {
       runBlueprintWizard();
+    });
+
+    wrapper.querySelector('#store-mode-blueprint-add-scene').addEventListener('click', () => {
+      const container = wrapper.querySelector('#store-mode-blueprint-scenes-editor');
+      const scene = { title: `Scene ${container.children.length + 1}`, beats: [] };
+      const currentScenes = readScenesEditor(container);
+      currentScenes.push(scene);
+      buildScenesEditor(container, currentScenes);
     });
 
     wrapper.querySelector('#store-mode-blueprint-library-refresh').addEventListener('click', async () => {
@@ -1291,6 +1557,10 @@
 
     if (blueprintLibrarySearch) {
       blueprintLibrarySearch.addEventListener('input', renderBlueprintLibrary);
+    }
+
+    if (blueprintChecklist) {
+      blueprintChecklist.addEventListener('storemode-refresh', renderBeatChecklistUI);
     }
 
     if (blueprintLibraryView) {
@@ -1329,6 +1599,7 @@
       await saveChatState();
       blueprintSceneInput.value = `Scene ${state.currentSceneIndex + 1} / Beat ${state.currentBeatIndex + 1}`;
       updateExtensionPrompt();
+      renderBeatChecklistUI();
     });
 
     wrapper.querySelector('#store-mode-blueprint-advance-scene').addEventListener('click', async () => {
@@ -1339,6 +1610,7 @@
       await saveChatState();
       blueprintSceneInput.value = `Scene ${state.currentSceneIndex + 1} / Beat ${state.currentBeatIndex + 1}`;
       updateExtensionPrompt();
+      renderBeatChecklistUI();
     });
 
     wrapper.querySelector('#store-mode-flag-arcs').checked = settings.featureFlags.storyArcs;
@@ -1396,11 +1668,59 @@
       promptPreviewArea.value = settings.promptOptions.preview ? buildInjection() : '';
     });
 
+    const profiles = getConnectionProfiles();
+    const populateProfileSelect = (select, selectedValue) => {
+      if (!select) return;
+      select.innerHTML = '';
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = '';
+      defaultOpt.textContent = 'Default API';
+      select.appendChild(defaultOpt);
+      profiles.forEach(profile => {
+        const opt = document.createElement('option');
+        opt.value = profile.id;
+        opt.textContent = `${profile.name} (${profile.id})`;
+        select.appendChild(opt);
+      });
+      select.value = selectedValue || '';
+    };
+
+    populateProfileSelect(profileArcSelect, settings.llmProfiles.arc);
+    populateProfileSelect(profileAuthorSelect, settings.llmProfiles.author);
+    populateProfileSelect(profileBlueprintSelect, settings.llmProfiles.blueprint);
+    populateProfileSelect(profileExtrasSelect, settings.llmProfiles.extras);
+
+    if (profileArcSelect) {
+      profileArcSelect.addEventListener('change', () => {
+        settings.llmProfiles.arc = profileArcSelect.value;
+        saveSettings();
+      });
+    }
+    if (profileAuthorSelect) {
+      profileAuthorSelect.addEventListener('change', () => {
+        settings.llmProfiles.author = profileAuthorSelect.value;
+        saveSettings();
+      });
+    }
+    if (profileBlueprintSelect) {
+      profileBlueprintSelect.addEventListener('change', () => {
+        settings.llmProfiles.blueprint = profileBlueprintSelect.value;
+        saveSettings();
+      });
+    }
+    if (profileExtrasSelect) {
+      profileExtrasSelect.addEventListener('change', () => {
+        settings.llmProfiles.extras = profileExtrasSelect.value;
+        saveSettings();
+      });
+    }
+
     renderArcList();
     renderAuthorList();
     renderBlueprintList();
     renderBlueprintLibrary();
     syncActiveSelections();
+    renderBeatChecklistUI();
   }
 
   async function runBlueprintWizard() {
@@ -1452,16 +1772,22 @@
     };
 
     const { generateRaw } = SillyTavern.getContext();
+    const settings = getSettings();
     const prompt = `Generate a scenario blueprint JSON with 3-6 scenes. Title: ${title}. Logline: ${logline}. Genre: ${genre}.`;
 
     try {
-      const result = await generateRaw({
-        prompt,
-        jsonSchema: schema
-      });
-      const raw = typeof result === 'string' ? result : (result && (result.response || result.text || result.output)) || '';
+      let raw = '';
+      if (settings.llmProfiles.blueprint) {
+        raw = await sendProfileRequest(settings.llmProfiles.blueprint, prompt, 800);
+      }
+      if (!raw) {
+        const result = await generateRaw({
+          prompt,
+          jsonSchema: schema
+        });
+        raw = typeof result === 'string' ? result : (result && (result.response || result.text || result.output)) || '';
+      }
       const blueprint = JSON.parse(raw);
-      const settings = getSettings();
       blueprint.id = makeId('blueprint');
       settings.blueprints.unshift(blueprint);
       saveSettings();
@@ -1543,6 +1869,11 @@
     };
     const quietPrompt = instructions[mode];
     if (!quietPrompt) return '';
+    const settings = getSettings();
+    if (settings.llmProfiles.extras) {
+      const response = await sendProfileRequest(settings.llmProfiles.extras, quietPrompt, 512);
+      if (response) return response;
+    }
     const result = await generateQuietPrompt({ quietPrompt });
     return typeof result === 'string' ? result : (result && (result.response || result.text || result.output)) || '';
   }
@@ -1672,6 +2003,13 @@
     }
     await saveChatState();
     updateExtensionPrompt();
+    const panel = document.getElementById('store-mode-settings');
+    if (panel) {
+      const checklist = panel.querySelector('#store-mode-blueprint-checklist');
+      if (checklist) {
+        checklist.dispatchEvent(new Event('storemode-refresh', { bubbles: true }));
+      }
+    }
     if (state.storyComplete) {
       handleCompletionExtras().catch(err => console.warn('[Store Mode] Auto extras failed', err));
     }
@@ -1735,9 +2073,16 @@
   }
 
   async function readJsonFile(file) {
-    const text = await file.text();
-    const parsed = JSON.parse(text);
-    return parsed.items ? parsed.items : parsed;
+    const { toastr } = SillyTavern.getContext();
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      return parsed.items ? parsed.items : parsed;
+    } catch (err) {
+      console.warn('[Store Mode] Failed to parse JSON import', err);
+      toastr && toastr.warning('Store Mode: invalid JSON file.');
+      return null;
+    }
   }
 
   function exportBlueprintPng(blueprint) {

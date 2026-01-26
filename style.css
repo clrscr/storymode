@@ -46,6 +46,12 @@
   gap: 12px;
 }
 
+@media (max-width: 900px) {
+  .store-mode-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .store-mode-list {
   border: 1px solid var(--SmartThemeBorderColor, #444);
   border-radius: 6px;
@@ -100,7 +106,7 @@
 
 .store-mode-library-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 
@@ -111,6 +117,24 @@
   background: var(--SmartThemeInputColor, #1b1b1b);
   color: var(--SmartThemeBodyColor, #e6e6e6);
   cursor: pointer;
+}
+
+.store-mode-scene {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--SmartThemeBorderColor, #444);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: var(--SmartThemeBlurTint, #1b1b1b);
+}
+
+.store-mode-beat-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0;
 }
 
 .store-mode-list button {
