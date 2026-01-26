@@ -27,6 +27,11 @@
       manifestLoaded: false,
       manifest: null
     },
+    extrasOptions: {
+      autoEpilogue: true,
+      autoSummary: false,
+      autoNext: false
+    },
     storyArcs: [],
     authorStyles: [],
     blueprints: [],
@@ -84,6 +89,9 @@
         arcLength: 30,
         pacingMode: 'story',
         storyComplete: false
+        ,epilogueDone: false
+        ,summaryDone: false
+        ,nextDone: false
       };
     }
     return chatMetadata[MODULE_NAME];
@@ -151,6 +159,17 @@
     return response.text();
   }
 
+  async function downloadFileAsBlob(filename) {
+    const response = await fetch(toFileUrl(filename), {
+      method: 'GET',
+      headers: getRequestHeadersSafe()
+    });
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+    return response.blob();
+  }
+
   async function deleteFile(filename) {
     const response = await fetch('/api/files/delete', {
       method: 'POST',
@@ -176,6 +195,132 @@
 
   function getBlueprintFilename(id) {
     return `${FILE_PREFIX}bp-${id}.png`;
+  }
+
+  function dataUrlToUint8Array(dataUrl) {
+    const base64 = dataUrl.split(',')[1] || '';
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  function uint8ArrayToDataUrl(bytes, mime = 'image/png') {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 1) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return `data:${mime};base64,${btoa(binary)}`;
+  }
+
+  function crc32(bytes) {
+    let crc = 0 ^ (-1);
+    for (let i = 0; i < bytes.length; i += 1) {
+      let c = (crc ^ bytes[i]) & 0xff;
+      for (let k = 0; k < 8; k += 1) {
+        c = c & 1 ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      crc = (crc >>> 8) ^ c;
+    }
+    return (crc ^ (-1)) >>> 0;
+  }
+
+  function encodeTextChunk(keyword, text) {
+    const encoder = new TextEncoder();
+    const keywordBytes = encoder.encode(keyword);
+    const textBytes = encoder.encode(text);
+    const data = new Uint8Array(keywordBytes.length + 1 + textBytes.length);
+    data.set(keywordBytes, 0);
+    data[keywordBytes.length] = 0;
+    data.set(textBytes, keywordBytes.length + 1);
+
+    const type = new TextEncoder().encode('tEXt');
+    const length = data.length;
+    const chunk = new Uint8Array(12 + length);
+    const view = new DataView(chunk.buffer);
+    view.setUint32(0, length);
+    chunk.set(type, 4);
+    chunk.set(data, 8);
+    const crc = crc32(new Uint8Array([...type, ...data]));
+    view.setUint32(8 + length, crc);
+    return chunk;
+  }
+
+  function insertTextChunk(pngBytes, keyword, text) {
+    const signature = pngBytes.slice(0, 8);
+    const chunks = [];
+    let offset = 8;
+    while (offset < pngBytes.length) {
+      const length = new DataView(pngBytes.buffer, offset, 4).getUint32(0);
+      const type = String.fromCharCode(
+        pngBytes[offset + 4],
+        pngBytes[offset + 5],
+        pngBytes[offset + 6],
+        pngBytes[offset + 7]
+      );
+      const chunkEnd = offset + 12 + length;
+      const chunk = pngBytes.slice(offset, chunkEnd);
+      if (type === 'IEND') {
+        const textChunk = encodeTextChunk(keyword, text);
+        chunks.push(textChunk);
+      }
+      chunks.push(chunk);
+      offset = chunkEnd;
+    }
+    const totalLength = 8 + chunks.reduce((sum, c) => sum + c.length, 0);
+    const output = new Uint8Array(totalLength);
+    output.set(signature, 0);
+    let outOffset = 8;
+    chunks.forEach((chunk) => {
+      output.set(chunk, outOffset);
+      outOffset += chunk.length;
+    });
+    return output;
+  }
+
+  function extractTextChunks(pngBytes) {
+    const chunks = {};
+    let offset = 8;
+    while (offset < pngBytes.length) {
+      const length = new DataView(pngBytes.buffer, offset, 4).getUint32(0);
+      const type = String.fromCharCode(
+        pngBytes[offset + 4],
+        pngBytes[offset + 5],
+        pngBytes[offset + 6],
+        pngBytes[offset + 7]
+      );
+      if (type === 'tEXt') {
+        const dataStart = offset + 8;
+        const dataEnd = dataStart + length;
+        const data = pngBytes.slice(dataStart, dataEnd);
+        const nulIndex = data.indexOf(0);
+        if (nulIndex > -1) {
+          const key = new TextDecoder().decode(data.slice(0, nulIndex));
+          const value = new TextDecoder().decode(data.slice(nulIndex + 1));
+          chunks[key] = value;
+        }
+      }
+      offset += 12 + length;
+    }
+    return chunks;
+  }
+
+  function embedBlueprintInPng(dataUrl, blueprint) {
+    const json = JSON.stringify(blueprint);
+    const bytes = dataUrlToUint8Array(dataUrl);
+    const injected = insertTextChunk(bytes, 'STOREMODE_JSON', json);
+    return uint8ArrayToDataUrl(injected);
+  }
+
+  async function extractBlueprintFromPng(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    const chunks = extractTextChunks(bytes);
+    if (!chunks.STOREMODE_JSON) return null;
+    return JSON.parse(chunks.STOREMODE_JSON);
   }
 
   async function seedDefaults() {
@@ -474,15 +619,21 @@
               <button id="store-mode-blueprint-clear">Clear selection</button>
             </div>
             <div class="store-mode-list" id="store-mode-blueprint-list"></div>
+            <div class="store-mode-field"><label>Library</label></div>
+            <div class="store-mode-list" id="store-mode-blueprint-library"></div>
             <div class="store-mode-actions">
               <button id="store-mode-blueprint-new">New</button>
               <button id="store-mode-blueprint-delete">Delete</button>
               <button id="store-mode-blueprint-advance-beat">Next Beat</button>
               <button id="store-mode-blueprint-advance-scene">Next Scene</button>
+              <button id="store-mode-blueprint-library-refresh">Refresh Library</button>
               <button id="store-mode-blueprint-export">Export JSON</button>
               <button id="store-mode-blueprint-export-png">Export PNG</button>
               <label class="store-mode-actions">
                 <input id="store-mode-blueprint-import" type="file" accept="application/json" />
+              </label>
+              <label class="store-mode-actions">
+                <input id="store-mode-blueprint-import-png" type="file" accept="image/png" />
               </label>
             </div>
           </div>
@@ -514,6 +665,15 @@
         </div>
         <div class="store-mode-field">
           <label><input type="checkbox" id="store-mode-flag-nsfw" /> Enable Author NSFW Prompt</label>
+        </div>
+        <div class="store-mode-field">
+          <label><input type="checkbox" id="store-mode-flag-auto-epilogue" /> Auto Epilogue on Completion</label>
+        </div>
+        <div class="store-mode-field">
+          <label><input type="checkbox" id="store-mode-flag-auto-summary" /> Auto Summary on Completion</label>
+        </div>
+        <div class="store-mode-field">
+          <label><input type="checkbox" id="store-mode-flag-auto-next" /> Auto “What’s Next” on Completion</label>
         </div>
         <div class="store-mode-actions">
           <button id="store-mode-run-summary">Generate Summary</button>
@@ -557,6 +717,7 @@
     const blueprintList = wrapper.querySelector('#store-mode-blueprint-list');
     const blueprintActive = wrapper.querySelector('#store-mode-active-blueprint');
     const blueprintSceneInput = wrapper.querySelector('#store-mode-blueprint-scene');
+    const blueprintLibraryList = wrapper.querySelector('#store-mode-blueprint-library');
 
     let selectedArcId = null;
     let selectedAuthorId = null;
@@ -649,6 +810,32 @@
         opt.textContent = item.title || '(untitled)';
         opt.selected = item.id === state.activeBlueprintId;
         blueprintActive.appendChild(opt);
+      });
+    }
+
+    function renderBlueprintLibrary() {
+      blueprintLibraryList.innerHTML = '';
+      const settings = getSettings();
+      const manifest = settings.blueprintLibrary.manifest;
+      if (!manifest || !Array.isArray(manifest.blueprints) || !manifest.blueprints.length) {
+        const empty = document.createElement('div');
+        empty.textContent = 'No library items yet';
+        blueprintLibraryList.appendChild(empty);
+        return;
+      }
+      manifest.blueprints.forEach(entry => {
+        const row = document.createElement('button');
+        row.textContent = entry.title || entry.blueprint_id;
+        row.addEventListener('click', async () => {
+          const blueprint = await loadBlueprintFromLibrary(entry);
+          if (!blueprint) return;
+          upsertBlueprint(settings.blueprints, blueprint);
+          selectedBlueprintId = blueprint.id;
+          fillBlueprintForm(blueprint);
+          renderBlueprintList();
+          saveSettings();
+        });
+        blueprintLibraryList.appendChild(row);
       });
     }
 
@@ -935,8 +1122,31 @@
       }
     });
 
+    wrapper.querySelector('#store-mode-blueprint-import-png').addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const blueprint = await extractBlueprintFromPng(file);
+        if (!blueprint) return;
+        const settings = getSettings();
+        if (!blueprint.id) blueprint.id = makeId('blueprint');
+        upsertBlueprint(settings.blueprints, blueprint);
+        selectedBlueprintId = blueprint.id;
+        fillBlueprintForm(blueprint);
+        renderBlueprintList();
+        saveSettings();
+      } catch (err) {
+        console.warn('[Store Mode] PNG import failed', err);
+      }
+    });
+
     wrapper.querySelector('#store-mode-blueprint-generate').addEventListener('click', () => {
       runBlueprintWizard();
+    });
+
+    wrapper.querySelector('#store-mode-blueprint-library-refresh').addEventListener('click', async () => {
+      await loadBlueprintLibrary();
+      renderBlueprintLibrary();
     });
 
     wrapper.querySelector('#store-mode-blueprint-advance-beat').addEventListener('click', async () => {
@@ -961,6 +1171,9 @@
     wrapper.querySelector('#store-mode-flag-blueprints').checked = settings.featureFlags.blueprints;
     wrapper.querySelector('#store-mode-flag-extras').checked = settings.featureFlags.extras;
     wrapper.querySelector('#store-mode-flag-nsfw').checked = settings.nsfwAuthorStyle;
+    wrapper.querySelector('#store-mode-flag-auto-epilogue').checked = settings.extrasOptions.autoEpilogue;
+    wrapper.querySelector('#store-mode-flag-auto-summary').checked = settings.extrasOptions.autoSummary;
+    wrapper.querySelector('#store-mode-flag-auto-next').checked = settings.extrasOptions.autoNext;
 
     arcLengthInput.value = settings.arcLengthDefault;
 
@@ -979,6 +1192,9 @@
     bindCheckbox('#store-mode-flag-blueprints', (value) => { settings.featureFlags.blueprints = value; });
     bindCheckbox('#store-mode-flag-extras', (value) => { settings.featureFlags.extras = value; });
     bindCheckbox('#store-mode-flag-nsfw', (value) => { settings.nsfwAuthorStyle = value; });
+    bindCheckbox('#store-mode-flag-auto-epilogue', (value) => { settings.extrasOptions.autoEpilogue = value; });
+    bindCheckbox('#store-mode-flag-auto-summary', (value) => { settings.extrasOptions.autoSummary = value; });
+    bindCheckbox('#store-mode-flag-auto-next', (value) => { settings.extrasOptions.autoNext = value; });
 
     arcLengthInput.addEventListener('change', (e) => {
       settings.arcLengthDefault = Math.max(parseInt(e.target.value || settings.arcLengthDefault, 10) || settings.arcLengthDefault, 1);
@@ -992,6 +1208,7 @@
     renderArcList();
     renderAuthorList();
     renderBlueprintList();
+    renderBlueprintLibrary();
     syncActiveSelections();
   }
 
@@ -1084,6 +1301,61 @@
     }
   }
 
+  async function pushSystemMessage(text) {
+    const ctx = SillyTavern.getContext();
+    if (typeof ctx.addOneMessage === 'function') {
+      ctx.addOneMessage({
+        is_user: false,
+        is_system: true,
+        name: 'Store Mode',
+        send_date: Date.now(),
+        mes: text
+      });
+      return;
+    }
+    if (ctx.Popup && ctx.Popup.show && ctx.Popup.show.text) {
+      await ctx.Popup.show.text('Store Mode', text);
+      return;
+    }
+    window.alert(text);
+  }
+
+  async function handleCompletionExtras() {
+    const settings = getSettings();
+    const state = getChatState();
+    if (!settings.featureFlags.extras || !state.storyComplete) return;
+
+    if (settings.extrasOptions.autoSummary && !state.summaryDone) {
+      const result = await generateQuiet('summary');
+      if (result) await pushSystemMessage(result);
+      state.summaryDone = true;
+    }
+    if (settings.extrasOptions.autoEpilogue && !state.epilogueDone) {
+      const result = await generateQuiet('epilogue');
+      if (result) await pushSystemMessage(result);
+      state.epilogueDone = true;
+    }
+    if (settings.extrasOptions.autoNext && !state.nextDone) {
+      const result = await generateQuiet('next');
+      if (result) await pushSystemMessage(result);
+      state.nextDone = true;
+    }
+    await saveChatState();
+  }
+
+  async function generateQuiet(mode) {
+    const { generateQuietPrompt } = SillyTavern.getContext();
+    const instructions = {
+      summary: 'Generate a concise summary of the story so far.',
+      epilogue: 'Write a short epilogue that closes the current story arc.',
+      next: 'Suggest what should happen next in the story.'
+    };
+    const quietPrompt = instructions[mode];
+    if (!quietPrompt) return '';
+    const result = await generateQuietPrompt({ quietPrompt });
+    return typeof result === 'string' ? result : (result && (result.response || result.text || result.output)) || '';
+  }
+
   function upsertBlueprint(list, blueprint) {
     const index = list.findIndex(item => item.id === blueprint.id);
     if (index >= 0) {
@@ -1100,17 +1372,26 @@
       const manifest = await downloadJSON(MANIFEST_FILENAME);
       settings.blueprintLibrary.manifest = manifest;
       settings.blueprintLibrary.manifestLoaded = true;
-      if (manifest && Array.isArray(manifest.blueprints)) {
-        manifest.blueprints.forEach(entry => {
-          if (entry && entry.blueprint && entry.blueprint.id) {
-            upsertBlueprint(settings.blueprints, entry.blueprint);
-          }
-        });
-        saveSettings();
-      }
+      saveSettings();
     } catch (err) {
       settings.blueprintLibrary.manifestLoaded = false;
     }
+  }
+
+  async function loadBlueprintFromLibrary(entry) {
+    if (!entry || !entry.filename) return null;
+    try {
+      const blob = await downloadFileAsBlob(entry.filename);
+      const buffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      const chunks = extractTextChunks(bytes);
+      if (chunks.STOREMODE_JSON) {
+        return JSON.parse(chunks.STOREMODE_JSON);
+      }
+    } catch (err) {
+      console.warn('[Store Mode] Failed to load blueprint from library', err);
+    }
+    return null;
   }
 
   async function saveBlueprintLibrary() {
@@ -1129,7 +1410,8 @@
     const now = new Date().toISOString();
     const filename = getBlueprintFilename(blueprint.id);
     const dataUrl = generateBlueprintPngDataUrl(blueprint);
-    const base64 = dataUrl.split(',')[1];
+    const embedded = embedBlueprintInPng(dataUrl, blueprint);
+    const base64 = embedded.split(',')[1];
 
     await uploadFile(filename, base64);
     const entry = {
@@ -1137,8 +1419,7 @@
       title: blueprint.title || '',
       created_at: existing ? existing.created_at : now,
       modified_at: now,
-      filename: filename,
-      blueprint
+      filename: filename
     };
     if (existing) {
       Object.assign(existing, entry);
@@ -1197,6 +1478,9 @@
     }
     await saveChatState();
     updateExtensionPrompt();
+    if (state.storyComplete) {
+      handleCompletionExtras().catch(err => console.warn('[Store Mode] Auto extras failed', err));
+    }
   }
 
   async function onMessageReceived(messageId) {
@@ -1238,6 +1522,9 @@
 
     await saveChatState();
     updateExtensionPrompt();
+    if (state.storyComplete) {
+      handleCompletionExtras().catch(err => console.warn('[Store Mode] Auto extras failed', err));
+    }
   }
 
   function downloadJson(data, filename) {
@@ -1258,9 +1545,10 @@
 
   function exportBlueprintPng(blueprint) {
     const dataUrl = generateBlueprintPngDataUrl(blueprint);
+    const embedded = embedBlueprintInPng(dataUrl, blueprint);
     const link = document.createElement('a');
     link.download = `${(blueprint.title || 'blueprint').replace(/\s+/g, '_')}.png`;
-    link.href = dataUrl;
+    link.href = embedded;
     link.click();
   }
 
