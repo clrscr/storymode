@@ -455,6 +455,27 @@
     let selectedAuthorId = null;
     let selectedBlueprintId = null;
 
+    function syncActiveSelections() {
+      const currentState = getChatState();
+      arcActive.value = currentState.activeArcId || '';
+      authorActive.value = currentState.activeAuthorId || '';
+      blueprintActive.value = currentState.activeBlueprintId || '';
+      arcLengthInput.value = currentState.arcLength || settings.arcLengthDefault;
+
+      selectedArcId = currentState.activeArcId || selectedArcId;
+      selectedAuthorId = currentState.activeAuthorId || selectedAuthorId;
+      selectedBlueprintId = currentState.activeBlueprintId || selectedBlueprintId;
+
+      const selectedArc = settings.storyArcs.find(item => item.id === selectedArcId);
+      if (selectedArc) fillArcForm(selectedArc);
+
+      const selectedAuthor = settings.authorStyles.find(item => item.id === selectedAuthorId);
+      if (selectedAuthor) fillAuthorForm(selectedAuthor);
+
+      const selectedBlueprint = settings.blueprints.find(item => item.id === selectedBlueprintId);
+      if (selectedBlueprint) fillBlueprintForm(selectedBlueprint);
+    }
+
     function renderArcList() {
       arcList.innerHTML = '';
       arcActive.innerHTML = '<option value="">None</option>';
@@ -830,6 +851,7 @@
     renderArcList();
     renderAuthorList();
     renderBlueprintList();
+    syncActiveSelections();
   }
 
   async function runBlueprintWizard() {
@@ -1074,7 +1096,40 @@
     if (event_types.MESSAGE_RECEIVED) {
       eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
     }
+    if (event_types.CHAT_CHANGED) {
+      eventSource.on(event_types.CHAT_CHANGED, () => {
+        const panel = document.getElementById('store-mode-settings');
+        if (!panel) return;
+        const settings = getSettings();
+        const state = getChatState();
+        const arcActive = panel.querySelector('#store-mode-active-arc');
+        const authorActive = panel.querySelector('#store-mode-active-author');
+        const blueprintActive = panel.querySelector('#store-mode-active-blueprint');
+        const arcLengthInput = panel.querySelector('#store-mode-arc-length');
+        if (arcActive) arcActive.value = state.activeArcId || '';
+        if (authorActive) authorActive.value = state.activeAuthorId || '';
+        if (blueprintActive) blueprintActive.value = state.activeBlueprintId || '';
+        if (arcLengthInput) arcLengthInput.value = state.arcLength || settings.arcLengthDefault;
+      });
+    }
   }
 
   init();
 })();
+    arcActive.addEventListener('change', () => {
+      selectedArcId = arcActive.value || null;
+      const item = settings.storyArcs.find(arc => arc.id === selectedArcId);
+      if (item) fillArcForm(item);
+    });
+
+    authorActive.addEventListener('change', () => {
+      selectedAuthorId = authorActive.value || null;
+      const item = settings.authorStyles.find(author => author.id === selectedAuthorId);
+      if (item) fillAuthorForm(item);
+    });
+
+    blueprintActive.addEventListener('change', () => {
+      selectedBlueprintId = blueprintActive.value || null;
+      const item = settings.blueprints.find(bp => bp.id === selectedBlueprintId);
+      if (item) fillBlueprintForm(item);
+    });
