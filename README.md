@@ -13,6 +13,43 @@ Store Mode adds narrative tooling to SillyTavern: Story Arcs, Author Styles, Sce
 3) (Optional) Create or load a **Scenario Blueprint**
 4) Click **Apply to chat** and start chatting
 
+## Tutorial: A Lovecraftian One‑Shot
+This walkthrough creates a short Cosmic Horror story in the style of H.P. Lovecraft.
+
+1) **Open Store Mode**
+   - Go to **Extensions → Store Mode**.
+
+2) **Select a Story Arc**
+   - In **Story Arcs**, choose **Cosmic Horror**.
+   - Set **Arc Length** to `12` (short one‑shot).
+   - Click **Apply to chat**.
+
+3) **Select an Author Style**
+   - Open **Author Styles** and choose **H.P. Lovecraft**.
+   - (Optional) Enable **NSFW Prompt** if desired.
+   - Click **Apply to chat**.
+
+4) **Create a Blueprint (Optional but recommended)**
+   - Go to **Scenario Blueprints** and click **Wizard (LLM)**.
+   - Use this example input:
+     - **Title:** The Whispering Reef
+     - **Logline:** A coastal researcher uncovers a pre‑human ruin that calls to her dreams.
+     - **Genre:** Cosmic Horror
+   - Save the generated blueprint.
+   - Click **Apply to chat**.
+
+5) **Start the Story**
+   - Begin the chat with a short prompt like:
+     - “We open on a storm‑battered coast. I’m cataloging artifacts from a newly exposed reef.”
+
+6) **Use Beat Tracking**
+   - Click **Next Beat** as the story progresses.
+   - If you want automated progression, enable **Auto‑Beat Detection** in **Extras**.
+
+7) **Wrap Up**
+   - When finished, click **Generate Epilogue** (or enable auto‑epilogue).
+   - Use **Generate Summary** to capture the one‑shot.
+
 ## Features & How To Use
 
 ### Story Arcs (Genres)
