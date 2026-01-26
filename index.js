@@ -27,6 +27,10 @@
       manifestLoaded: false,
       manifest: null
     },
+    promptOptions: {
+      priority: 10,
+      preview: true
+    },
     extrasOptions: {
       autoEpilogue: true,
       autoSummary: false,
@@ -92,6 +96,7 @@
         ,epilogueDone: false
         ,summaryDone: false
         ,nextDone: false
+        ,beatState: {}
       };
     }
     return chatMetadata[MODULE_NAME];
@@ -398,7 +403,8 @@
         const signalHint = state.pacingMode === 'scenario'
           ? 'Use @@BEAT:N@@, @@NEXT_SCENE@@, @@STORY_COMPLETE@@ signals at the end of responses.'
           : '';
-        sections.push(`Scenario Blueprint\nTitle: ${blueprint.title || ''}\nCurrent Beat: ${beat.label || ''}\nGoal: ${beat.goal || ''}\nPrompt: ${beat.prompt || ''}\n${signalHint}`.trim());
+        const checklist = buildBeatChecklist(blueprint, state);
+        sections.push(`Scenario Blueprint\nTitle: ${blueprint.title || ''}\nCurrent Beat: ${beat.label || ''}\nGoal: ${beat.goal || ''}\nPrompt: ${beat.prompt || ''}\n${signalHint}\n${checklist ? `Checklist:\n${checklist}` : ''}`.trim());
       }
     }
 
@@ -406,8 +412,24 @@
     return `Store Mode Guidance\n\n${sections.join('\n\n')}`;
   }
 
+  function buildBeatChecklist(blueprint, state) {
+    if (!blueprint || !Array.isArray(blueprint.scenes)) return '';
+    const lines = [];
+    blueprint.scenes.forEach((scene, sceneIndex) => {
+      lines.push(`Scene ${sceneIndex + 1}: ${scene.title || ''}`.trim());
+      (scene.beats || []).forEach((beat, beatIndex) => {
+        const key = `${sceneIndex}:${beatIndex}`;
+        const status = (state.beatState && state.beatState[key]) || 'pending';
+        const marker = status === 'complete' ? '✓' : status === 'skipped' ? 'x' : '→';
+        lines.push(`  [${marker}] ${beat.label || beat.title || 'Beat'}: ${beat.goal || beat.prompt || ''}`.trim());
+      });
+    });
+    return lines.join('\n');
+  }
+
   function updateExtensionPrompt() {
     const ctx = SillyTavern.getContext();
+    const settings = getSettings();
     const injection = buildInjection();
     if (typeof ctx.setExtensionPrompt === 'function') {
       if (ctx.extension_prompt_types && ctx.extension_prompt_roles) {
@@ -416,7 +438,7 @@
           injection,
           ctx.extension_prompt_types.CHAT,
           ctx.extension_prompt_roles.SYSTEM,
-          10
+          settings.promptOptions.priority || 10
         );
       } else {
         ctx.setExtensionPrompt(MODULE_NAME, injection);
@@ -620,6 +642,7 @@
             </div>
             <div class="store-mode-list" id="store-mode-blueprint-list"></div>
             <div class="store-mode-field"><label>Library</label></div>
+            <div class="store-mode-field"><input id="store-mode-blueprint-library-search" placeholder="Search library..." /></div>
             <div class="store-mode-list" id="store-mode-blueprint-library"></div>
             <div class="store-mode-actions">
               <button id="store-mode-blueprint-new">New</button>
@@ -680,6 +703,17 @@
           <button id="store-mode-run-epilogue">Generate Epilogue</button>
           <button id="store-mode-run-next">Generate What's Next</button>
         </div>
+        <div class="store-mode-field">
+          <label>Prompt Priority</label>
+          <input id="store-mode-prompt-priority" type="number" min="-100" max="100" />
+        </div>
+        <div class="store-mode-field">
+          <label><input type="checkbox" id="store-mode-flag-preview" /> Show Prompt Preview</label>
+        </div>
+        <div class="store-mode-field">
+          <label>Prompt Preview</label>
+          <textarea id="store-mode-prompt-preview" rows="8" readonly></textarea>
+        </div>
       </div>
     `;
 
@@ -718,6 +752,10 @@
     const blueprintActive = wrapper.querySelector('#store-mode-active-blueprint');
     const blueprintSceneInput = wrapper.querySelector('#store-mode-blueprint-scene');
     const blueprintLibraryList = wrapper.querySelector('#store-mode-blueprint-library');
+    const blueprintLibrarySearch = wrapper.querySelector('#store-mode-blueprint-library-search');
+    const promptPriorityInput = wrapper.querySelector('#store-mode-prompt-priority');
+    const promptPreviewToggle = wrapper.querySelector('#store-mode-flag-preview');
+    const promptPreviewArea = wrapper.querySelector('#store-mode-prompt-preview');
 
     let selectedArcId = null;
     let selectedAuthorId = null;
@@ -823,9 +861,41 @@
         blueprintLibraryList.appendChild(empty);
         return;
       }
-      manifest.blueprints.forEach(entry => {
-        const row = document.createElement('button');
-        row.textContent = entry.title || entry.blueprint_id;
+      const query = (blueprintLibrarySearch && blueprintLibrarySearch.value || '').toLowerCase();
+      const entries = manifest.blueprints.filter(entry => {
+        if (!query) return true;
+        return (entry.title || '').toLowerCase().includes(query);
+      });
+      entries.forEach(entry => {
+        const row = document.createElement('div');
+        row.className = 'store-mode-library-row';
+        const button = document.createElement('button');
+        button.textContent = entry.title || entry.blueprint_id;
+        const fav = document.createElement('button');
+        fav.textContent = entry.favorite ? '★' : '☆';
+        fav.title = 'Toggle favorite';
+        fav.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          entry.favorite = !entry.favorite;
+          await saveBlueprintLibrary();
+          renderBlueprintLibrary();
+        });
+        const load = document.createElement('button');
+        load.textContent = 'Load';
+        load.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          const blueprint = await loadBlueprintFromLibrary(entry);
+          if (!blueprint) return;
+          upsertBlueprint(settings.blueprints, blueprint);
+          selectedBlueprintId = blueprint.id;
+          fillBlueprintForm(blueprint);
+          renderBlueprintList();
+          saveSettings();
+          updateExtensionPrompt();
+        });
+        row.appendChild(button);
+        row.appendChild(fav);
+        row.appendChild(load);
         row.addEventListener('click', async () => {
           const blueprint = await loadBlueprintFromLibrary(entry);
           if (!blueprint) return;
@@ -834,6 +904,7 @@
           fillBlueprintForm(blueprint);
           renderBlueprintList();
           saveSettings();
+          updateExtensionPrompt();
         });
         blueprintLibraryList.appendChild(row);
       });
@@ -1149,9 +1220,16 @@
       renderBlueprintLibrary();
     });
 
+    if (blueprintLibrarySearch) {
+      blueprintLibrarySearch.addEventListener('input', renderBlueprintLibrary);
+    }
+
     wrapper.querySelector('#store-mode-blueprint-advance-beat').addEventListener('click', async () => {
       const state = getChatState();
       state.currentBeatIndex = (state.currentBeatIndex || 0) + 1;
+      if (!state.beatState) state.beatState = {};
+      const key = `${state.currentSceneIndex || 0}:${state.currentBeatIndex}`;
+      state.beatState[key] = 'complete';
       await saveChatState();
       blueprintSceneInput.value = `Scene ${state.currentSceneIndex + 1} / Beat ${state.currentBeatIndex + 1}`;
       updateExtensionPrompt();
@@ -1161,6 +1239,7 @@
       const state = getChatState();
       state.currentSceneIndex = (state.currentSceneIndex || 0) + 1;
       state.currentBeatIndex = 0;
+      if (!state.beatState) state.beatState = {};
       await saveChatState();
       blueprintSceneInput.value = `Scene ${state.currentSceneIndex + 1} / Beat ${state.currentBeatIndex + 1}`;
       updateExtensionPrompt();
@@ -1174,7 +1253,6 @@
     wrapper.querySelector('#store-mode-flag-auto-epilogue').checked = settings.extrasOptions.autoEpilogue;
     wrapper.querySelector('#store-mode-flag-auto-summary').checked = settings.extrasOptions.autoSummary;
     wrapper.querySelector('#store-mode-flag-auto-next').checked = settings.extrasOptions.autoNext;
-
     arcLengthInput.value = settings.arcLengthDefault;
 
     const bindCheckbox = (selector, setter) => {
@@ -1204,6 +1282,23 @@
     wrapper.querySelector('#store-mode-run-summary').addEventListener('click', () => runExtras('summary'));
     wrapper.querySelector('#store-mode-run-epilogue').addEventListener('click', () => runExtras('epilogue'));
     wrapper.querySelector('#store-mode-run-next').addEventListener('click', () => runExtras('next'));
+
+    promptPriorityInput.value = settings.promptOptions.priority;
+    promptPreviewToggle.checked = settings.promptOptions.preview;
+    promptPreviewArea.value = settings.promptOptions.preview ? buildInjection() : '';
+
+    promptPriorityInput.addEventListener('change', () => {
+      settings.promptOptions.priority = parseInt(promptPriorityInput.value || '10', 10) || 10;
+      saveSettings();
+      updateExtensionPrompt();
+      promptPreviewArea.value = settings.promptOptions.preview ? buildInjection() : '';
+    });
+
+    promptPreviewToggle.addEventListener('change', (e) => {
+      settings.promptOptions.preview = !!e.target.checked;
+      saveSettings();
+      promptPreviewArea.value = settings.promptOptions.preview ? buildInjection() : '';
+    });
 
     renderArcList();
     renderAuthorList();
@@ -1510,6 +1605,9 @@
       if (signal.type === 'BEAT' || signal.type === 'SKIP') {
         const beatIndex = Math.max(parseInt(signal.value || '0', 10), 0);
         state.currentBeatIndex = Math.max(state.currentBeatIndex || 0, beatIndex);
+        const key = `${state.currentSceneIndex || 0}:${beatIndex}`;
+        if (!state.beatState) state.beatState = {};
+        state.beatState[key] = signal.type === 'SKIP' ? 'skipped' : 'complete';
       }
       if (signal.type === 'NEXT_SCENE') {
         state.currentSceneIndex = (state.currentSceneIndex || 0) + 1;
@@ -1625,6 +1723,8 @@
         const blueprintActive = panel.querySelector('#store-mode-active-blueprint');
         const arcLengthInput = panel.querySelector('#store-mode-arc-length');
         const blueprintSceneInput = panel.querySelector('#store-mode-blueprint-scene');
+        const promptPreviewArea = panel.querySelector('#store-mode-prompt-preview');
+        const promptPreviewToggle = panel.querySelector('#store-mode-flag-preview');
         if (arcActive) arcActive.value = state.activeArcId || '';
         if (authorActive) authorActive.value = state.activeAuthorId || '';
         if (blueprintActive) blueprintActive.value = state.activeBlueprintId || '';
@@ -1633,6 +1733,9 @@
           blueprintSceneInput.value = state.activeBlueprintId
             ? `Scene ${state.currentSceneIndex + 1} / Beat ${state.currentBeatIndex + 1}`
             : '';
+        }
+        if (promptPreviewArea && promptPreviewToggle && promptPreviewToggle.checked) {
+          promptPreviewArea.value = buildInjection();
         }
       });
     }
