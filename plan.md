@@ -126,7 +126,7 @@ store-mode/
 ## Progress
 - Completed: Steps 1–7 (scaffold, seeding/helpers, UI, prompt injection, wizard, export/import, extras).
 - Completed: Seeded 40 Story Arcs + 40 Author Styles.
-- In progress: Alignment with Prompt-And-Circumstance/StoryMode (story type schema fields, phase prompts, arc length tracking, signal parsing).
+- In progress: Alignment with Prompt-And-Circumstance/StoryMode (story type schema fields, phase prompts, arc length tracking, signal parsing, setExtensionPrompt injection, file-backed blueprint manifest).
 - Pending: Step 8 (QA/install verification).
 
 ## Testing Checklist

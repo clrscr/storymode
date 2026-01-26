@@ -22,6 +22,11 @@
     },
     arcLengthDefault: 30,
     nsfwAuthorStyle: false,
+    blueprintLibrary: {
+      enabled: true,
+      manifestLoaded: false,
+      manifest: null
+    },
     storyArcs: [],
     authorStyles: [],
     blueprints: [],
@@ -94,6 +99,83 @@
       return `${prefix}_${globalThis.crypto.randomUUID()}`;
     }
     return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+
+  function getRequestHeadersSafe() {
+    if (typeof window.getRequestHeaders === 'function') {
+      return window.getRequestHeaders();
+    }
+    return { 'Content-Type': 'application/json' };
+  }
+
+  const FILE_PREFIX = 'storymode-';
+  const MANIFEST_FILENAME = 'storymode-manifest.json';
+
+  function ensurePrefixed(name) {
+    if (name.startsWith(FILE_PREFIX)) return name;
+    return FILE_PREFIX + name;
+  }
+
+  function toFilePath(filename) {
+    if (filename.startsWith('user/files/')) return filename;
+    if (filename.startsWith('/user/files/')) return filename.substring(1);
+    return `user/files/${ensurePrefixed(filename)}`;
+  }
+
+  function toFileUrl(filename) {
+    const path = toFilePath(filename);
+    return path.startsWith('/') ? path : `/${path}`;
+  }
+
+  async function uploadFile(filename, base64Data) {
+    const response = await fetch('/api/files/upload', {
+      method: 'POST',
+      headers: getRequestHeadersSafe(),
+      body: JSON.stringify({ name: ensurePrefixed(filename), data: base64Data })
+    });
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${await response.text()}`);
+    }
+    const data = await response.json();
+    return data.path;
+  }
+
+  async function downloadFile(filename) {
+    const response = await fetch(toFileUrl(filename), {
+      method: 'GET',
+      headers: getRequestHeadersSafe()
+    });
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+    return response.text();
+  }
+
+  async function deleteFile(filename) {
+    const response = await fetch('/api/files/delete', {
+      method: 'POST',
+      headers: getRequestHeadersSafe(),
+      body: JSON.stringify({ path: toFilePath(filename) })
+    });
+    if (!response.ok) {
+      throw new Error(`Delete failed: ${await response.text()}`);
+    }
+    return true;
+  }
+
+  async function uploadJSON(filename, obj) {
+    const text = JSON.stringify(obj, null, 2);
+    const base64 = btoa(unescape(encodeURIComponent(text)));
+    return uploadFile(filename, base64);
+  }
+
+  async function downloadJSON(filename) {
+    const text = await downloadFile(filename);
+    return JSON.parse(text);
+  }
+
+  function getBlueprintFilename(id) {
+    return `${FILE_PREFIX}bp-${id}.png`;
   }
 
   async function seedDefaults() {
@@ -177,6 +259,24 @@
 
     if (!sections.length) return '';
     return `Store Mode Guidance\n\n${sections.join('\n\n')}`;
+  }
+
+  function updateExtensionPrompt() {
+    const ctx = SillyTavern.getContext();
+    const injection = buildInjection();
+    if (typeof ctx.setExtensionPrompt === 'function') {
+      if (ctx.extension_prompt_types && ctx.extension_prompt_roles) {
+        ctx.setExtensionPrompt(
+          MODULE_NAME,
+          injection,
+          ctx.extension_prompt_types.CHAT,
+          ctx.extension_prompt_roles.SYSTEM,
+          10
+        );
+      } else {
+        ctx.setExtensionPrompt(MODULE_NAME, injection);
+      }
+    }
   }
 
   function getCurrentBeat(blueprint, beatIndex) {
@@ -365,6 +465,10 @@
               <label>Active Blueprint</label>
               <select id="store-mode-active-blueprint"></select>
             </div>
+            <div class="store-mode-field">
+              <label>Scene / Beat</label>
+              <input id="store-mode-blueprint-scene" disabled />
+            </div>
             <div class="store-mode-actions">
               <button id="store-mode-blueprint-apply">Apply to chat</button>
               <button id="store-mode-blueprint-clear">Clear selection</button>
@@ -373,6 +477,8 @@
             <div class="store-mode-actions">
               <button id="store-mode-blueprint-new">New</button>
               <button id="store-mode-blueprint-delete">Delete</button>
+              <button id="store-mode-blueprint-advance-beat">Next Beat</button>
+              <button id="store-mode-blueprint-advance-scene">Next Scene</button>
               <button id="store-mode-blueprint-export">Export JSON</button>
               <button id="store-mode-blueprint-export-png">Export PNG</button>
               <label class="store-mode-actions">
@@ -450,6 +556,7 @@
 
     const blueprintList = wrapper.querySelector('#store-mode-blueprint-list');
     const blueprintActive = wrapper.querySelector('#store-mode-active-blueprint');
+    const blueprintSceneInput = wrapper.querySelector('#store-mode-blueprint-scene');
 
     let selectedArcId = null;
     let selectedAuthorId = null;
@@ -461,6 +568,9 @@
       authorActive.value = currentState.activeAuthorId || '';
       blueprintActive.value = currentState.activeBlueprintId || '';
       arcLengthInput.value = currentState.arcLength || settings.arcLengthDefault;
+      blueprintSceneInput.value = currentState.activeBlueprintId
+        ? `Scene ${currentState.currentSceneIndex + 1} / Beat ${currentState.currentBeatIndex + 1}`
+        : '';
 
       selectedArcId = currentState.activeArcId || selectedArcId;
       selectedAuthorId = currentState.activeAuthorId || selectedAuthorId;
@@ -618,6 +728,7 @@
       };
       renderArcList();
       saveSettings();
+      updateExtensionPrompt();
     });
 
     wrapper.querySelector('#store-mode-arc-delete').addEventListener('click', () => {
@@ -635,6 +746,7 @@
       state.currentStep = 0;
       state.storyComplete = false;
       await saveChatState();
+      updateExtensionPrompt();
     });
 
     wrapper.querySelector('#store-mode-arc-clear').addEventListener('click', async () => {
@@ -644,6 +756,7 @@
       state.storyComplete = false;
       arcActive.value = '';
       await saveChatState();
+      updateExtensionPrompt();
     });
 
     wrapper.querySelector('#store-mode-arc-export').addEventListener('click', () => {
@@ -693,6 +806,7 @@
       item.keywords = keywords ? keywords.split(',').map(k => k.trim()).filter(Boolean) : [];
       renderAuthorList();
       saveSettings();
+      updateExtensionPrompt();
     });
 
     wrapper.querySelector('#store-mode-author-delete').addEventListener('click', () => {
@@ -707,6 +821,7 @@
       const state = getChatState();
       state.activeAuthorId = authorActive.value || null;
       await saveChatState();
+      updateExtensionPrompt();
     });
 
     wrapper.querySelector('#store-mode-author-clear').addEventListener('click', async () => {
@@ -714,6 +829,7 @@
       state.activeAuthorId = null;
       authorActive.value = '';
       await saveChatState();
+      updateExtensionPrompt();
     });
 
     wrapper.querySelector('#store-mode-author-export').addEventListener('click', () => {
@@ -760,11 +876,14 @@
       }
       renderBlueprintList();
       saveSettings();
+      syncBlueprintToLibrary(item).catch(err => console.warn('[Store Mode] Blueprint library sync failed', err));
+      updateExtensionPrompt();
     });
 
     wrapper.querySelector('#store-mode-blueprint-delete').addEventListener('click', () => {
       if (!selectedBlueprintId) return;
       settings.blueprints = settings.blueprints.filter(bp => bp.id !== selectedBlueprintId);
+      removeBlueprintFromLibrary(selectedBlueprintId).catch(err => console.warn('[Store Mode] Blueprint library delete failed', err));
       selectedBlueprintId = null;
       renderBlueprintList();
       saveSettings();
@@ -778,6 +897,8 @@
       state.pacingMode = state.activeBlueprintId ? 'scenario' : 'story';
       state.storyComplete = false;
       await saveChatState();
+      blueprintSceneInput.value = `Scene ${state.currentSceneIndex + 1} / Beat ${state.currentBeatIndex + 1}`;
+      updateExtensionPrompt();
     });
 
     wrapper.querySelector('#store-mode-blueprint-clear').addEventListener('click', async () => {
@@ -789,6 +910,8 @@
       state.storyComplete = false;
       blueprintActive.value = '';
       await saveChatState();
+      blueprintSceneInput.value = '';
+      updateExtensionPrompt();
     });
 
     wrapper.querySelector('#store-mode-blueprint-export').addEventListener('click', () => {
@@ -816,6 +939,23 @@
       runBlueprintWizard();
     });
 
+    wrapper.querySelector('#store-mode-blueprint-advance-beat').addEventListener('click', async () => {
+      const state = getChatState();
+      state.currentBeatIndex = (state.currentBeatIndex || 0) + 1;
+      await saveChatState();
+      blueprintSceneInput.value = `Scene ${state.currentSceneIndex + 1} / Beat ${state.currentBeatIndex + 1}`;
+      updateExtensionPrompt();
+    });
+
+    wrapper.querySelector('#store-mode-blueprint-advance-scene').addEventListener('click', async () => {
+      const state = getChatState();
+      state.currentSceneIndex = (state.currentSceneIndex || 0) + 1;
+      state.currentBeatIndex = 0;
+      await saveChatState();
+      blueprintSceneInput.value = `Scene ${state.currentSceneIndex + 1} / Beat ${state.currentBeatIndex + 1}`;
+      updateExtensionPrompt();
+    });
+
     wrapper.querySelector('#store-mode-flag-arcs').checked = settings.featureFlags.storyArcs;
     wrapper.querySelector('#store-mode-flag-authors').checked = settings.featureFlags.authorStyles;
     wrapper.querySelector('#store-mode-flag-blueprints').checked = settings.featureFlags.blueprints;
@@ -830,6 +970,7 @@
       input.addEventListener('change', (e) => {
         setter(!!e.target.checked);
         saveSettings();
+        updateExtensionPrompt();
       });
     };
 
@@ -943,6 +1084,88 @@
     }
   }
 
+  function upsertBlueprint(list, blueprint) {
+    const index = list.findIndex(item => item.id === blueprint.id);
+    if (index >= 0) {
+      list[index] = blueprint;
+    } else {
+      list.push(blueprint);
+    }
+  }
+
+  async function loadBlueprintLibrary() {
+    const settings = getSettings();
+    if (!settings.blueprintLibrary.enabled) return;
+    try {
+      const manifest = await downloadJSON(MANIFEST_FILENAME);
+      settings.blueprintLibrary.manifest = manifest;
+      settings.blueprintLibrary.manifestLoaded = true;
+      if (manifest && Array.isArray(manifest.blueprints)) {
+        manifest.blueprints.forEach(entry => {
+          if (entry && entry.blueprint && entry.blueprint.id) {
+            upsertBlueprint(settings.blueprints, entry.blueprint);
+          }
+        });
+        saveSettings();
+      }
+    } catch (err) {
+      settings.blueprintLibrary.manifestLoaded = false;
+    }
+  }
+
+  async function saveBlueprintLibrary() {
+    const settings = getSettings();
+    if (!settings.blueprintLibrary.enabled) return;
+    const manifest = settings.blueprintLibrary.manifest || { version: 1, blueprints: [] };
+    settings.blueprintLibrary.manifest = manifest;
+    await uploadJSON(MANIFEST_FILENAME, manifest);
+  }
+
+  async function syncBlueprintToLibrary(blueprint) {
+    const settings = getSettings();
+    if (!settings.blueprintLibrary.enabled) return;
+    const manifest = settings.blueprintLibrary.manifest || { version: 1, blueprints: [] };
+    const existing = manifest.blueprints.find(entry => entry.blueprint_id === blueprint.id);
+    const now = new Date().toISOString();
+    const filename = getBlueprintFilename(blueprint.id);
+    const dataUrl = generateBlueprintPngDataUrl(blueprint);
+    const base64 = dataUrl.split(',')[1];
+
+    await uploadFile(filename, base64);
+    const entry = {
+      blueprint_id: blueprint.id,
+      title: blueprint.title || '',
+      created_at: existing ? existing.created_at : now,
+      modified_at: now,
+      filename: filename,
+      blueprint
+    };
+    if (existing) {
+      Object.assign(existing, entry);
+    } else {
+      manifest.blueprints.push(entry);
+    }
+    settings.blueprintLibrary.manifest = manifest;
+    await saveBlueprintLibrary();
+  }
+
+  async function removeBlueprintFromLibrary(blueprintId) {
+    const settings = getSettings();
+    if (!settings.blueprintLibrary.enabled) return;
+    const manifest = settings.blueprintLibrary.manifest;
+    if (!manifest || !Array.isArray(manifest.blueprints)) return;
+    const entry = manifest.blueprints.find(item => item.blueprint_id === blueprintId);
+    if (entry && entry.filename) {
+      try {
+        await deleteFile(entry.filename);
+      } catch (err) {
+        console.warn('[Store Mode] Failed to delete blueprint file', err);
+      }
+    }
+    manifest.blueprints = manifest.blueprints.filter(item => item.blueprint_id !== blueprintId);
+    await saveBlueprintLibrary();
+  }
+
   function parseStorySignals(text) {
     const signals = [];
     let cleanText = text;
@@ -973,6 +1196,7 @@
       state.storyComplete = true;
     }
     await saveChatState();
+    updateExtensionPrompt();
   }
 
   async function onMessageReceived(messageId) {
@@ -1013,6 +1237,7 @@
     });
 
     await saveChatState();
+    updateExtensionPrompt();
   }
 
   function downloadJson(data, filename) {
@@ -1032,6 +1257,14 @@
   }
 
   function exportBlueprintPng(blueprint) {
+    const dataUrl = generateBlueprintPngDataUrl(blueprint);
+    const link = document.createElement('a');
+    link.download = `${(blueprint.title || 'blueprint').replace(/\s+/g, '_')}.png`;
+    link.href = dataUrl;
+    link.click();
+  }
+
+  function generateBlueprintPngDataUrl(blueprint) {
     const canvas = document.createElement('canvas');
     canvas.width = 1000;
     canvas.height = 1400;
@@ -1058,11 +1291,7 @@
       });
       y += 12;
     });
-
-    const link = document.createElement('a');
-    link.download = `${(blueprint.title || 'blueprint').replace(/\s+/g, '_')}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    return canvas.toDataURL('image/png');
   }
 
   function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
@@ -1087,6 +1316,7 @@
 
   async function init() {
     await seedDefaults();
+    await loadBlueprintLibrary();
 
     const { eventSource, event_types } = SillyTavern.getContext();
     eventSource.on(event_types.APP_READY, renderUI);
@@ -1106,10 +1336,16 @@
         const authorActive = panel.querySelector('#store-mode-active-author');
         const blueprintActive = panel.querySelector('#store-mode-active-blueprint');
         const arcLengthInput = panel.querySelector('#store-mode-arc-length');
+        const blueprintSceneInput = panel.querySelector('#store-mode-blueprint-scene');
         if (arcActive) arcActive.value = state.activeArcId || '';
         if (authorActive) authorActive.value = state.activeAuthorId || '';
         if (blueprintActive) blueprintActive.value = state.activeBlueprintId || '';
         if (arcLengthInput) arcLengthInput.value = state.arcLength || settings.arcLengthDefault;
+        if (blueprintSceneInput) {
+          blueprintSceneInput.value = state.activeBlueprintId
+            ? `Scene ${state.currentSceneIndex + 1} / Beat ${state.currentBeatIndex + 1}`
+            : '';
+        }
       });
     }
   }
